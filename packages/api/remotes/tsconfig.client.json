@@ -43,6 +43,9 @@
       "path": "../../host/plugin-inventory"
     },
     {
+      "path": "../../llm/token-usage-report"
+    },
+    {
       "path": "../../interaction/commands"
     },
     {

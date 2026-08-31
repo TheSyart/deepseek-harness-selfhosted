@@ -7,6 +7,12 @@ import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from './projection.ts'
+import type {
+  TokenUsageTimelineChunk,
+  TokenUsageTimelineRoute,
+  TokenUsageTimelineSample,
+  TokenUsageTimelineState,
+} from './types.ts'
 import { foldSurfaceProjection } from './surface-projection.ts'
 
 const zeroBuckets = (): TokenUsageProjection => ({
@@ -46,6 +52,53 @@ const projectionSchema = z.object({
   cacheReadTokens: z.number().int().nonnegative(),
   cacheWriteTokens: z.number().int().nonnegative(),
 }).strict()
+
+const timelineRouteSchema: z.ZodType<TokenUsageTimelineRoute> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('model'), provider: z.string().min(1), model: z.string().min(1) }).strict(),
+  z.object({ kind: z.literal('unknown') }).strict(),
+])
+
+const timelineSampleSchema: z.ZodType<TokenUsageTimelineSample> = z.object({
+  seq: z.number().int().nonnegative(),
+  time: z.number().finite(),
+  turn: z.number().int().nonnegative(),
+  step: z.number().int().nonnegative(),
+  route: timelineRouteSchema,
+  buckets: projectionSchema,
+}).strict()
+
+const TIMELINE_CHUNK_SIZE = 128
+
+const timelineChunkSchema: z.ZodType<TokenUsageTimelineChunk> = z.lazy(() => z.object({
+  samples: z.array(timelineSampleSchema).min(1).max(TIMELINE_CHUNK_SIZE),
+  previous: timelineChunkSchema.nullable(),
+}).strict())
+
+const tokenUsageTimelineStateSchema: z.ZodType<TokenUsageTimelineState> = z.object({
+  route: timelineRouteSchema,
+  step: z.object({
+    turn: z.number().int().nonnegative(),
+    step: z.number().int().nonnegative(),
+    time: z.number().finite(),
+  }).strict().nullable(),
+  head: timelineChunkSchema.nullable(),
+}).strict()
+
+/**
+ * Iterate one append-oriented timeline in original call order.
+ * @param state - persisted reverse-linked timeline chunks.
+ * @returns the retained provider-usage samples from oldest to newest.
+ */
+export function* tokenUsageTimelineSamples(
+  state: TokenUsageTimelineState,
+): Generator<TokenUsageTimelineSample, void> {
+  const reverse: TokenUsageTimelineChunk[] = []
+  for (let chunk = state.head; chunk !== null; chunk = chunk.previous) reverse.push(chunk)
+  for (let chunkIndex = reverse.length - 1; chunkIndex >= 0; chunkIndex -= 1) {
+    const chunk = reverse[chunkIndex]
+    if (chunk !== undefined) yield* chunk.samples
+  }
+}
 
 /**
  * The token-usage unit's state schema — the one definition of the state
@@ -149,6 +202,82 @@ export const tokenUsageProjectionDefinition = {
   },
   wire: { viewSchema: projectionSchema, view: state => state.totals },
 } satisfies ProjectionDefinition<'tokenUsage', TokenUsageState>
+
+/**
+ * Host-only model-call timeline used for cross-session usage reports.
+ *
+ * The first usage event fixes a sample's seq, step-start time, and route. A
+ * later cumulative sample for the same turn and step replaces only its token
+ * buckets, preserving the fork-deduplication and daily-grouping anchors.
+ */
+export const tokenUsageTimelineProjectionDefinition = {
+  key: 'tokenUsageTimeline',
+  stateVersion: 2,
+  checkpoint: 'detach',
+  stateSchema: tokenUsageTimelineStateSchema,
+  init: (): TokenUsageTimelineState => ({
+    route: { kind: 'unknown' },
+    step: null,
+    head: null,
+  }),
+  apply: (state, event) => {
+    if (event.type === 'request/header') {
+      const provider = event.data.header.config?.provider
+      const model = event.data.header.config?.model
+      const route: TokenUsageTimelineRoute = provider && model
+        ? { kind: 'model', provider, model }
+        : { kind: 'unknown' }
+      if (state.route.kind === route.kind
+        && (route.kind === 'unknown'
+          || (state.route.kind === 'model'
+            && state.route.provider === route.provider
+            && state.route.model === route.model))) return state
+      return { ...state, route }
+    }
+    if (event.type === 'step/start') {
+      return { ...state, step: { ...event.data, time: event.time } }
+    }
+    if (event.type === 'step/end') {
+      return state.step === null ? state : { ...state, step: null }
+    }
+
+    let turn: number
+    let step: number
+    let usage: TokenUsage
+    if (event.type === 'assistant/chunk' && event.data.chunk.type === 'usage') {
+      ;({ turn, step } = event.data)
+      usage = event.data.chunk.usage
+    } else if (event.type === 'assistant/message' && event.data.usage !== undefined) {
+      ;({ turn, step, usage } = event.data)
+    } else {
+      return state
+    }
+
+    const buckets = bucketsFrom(usage)
+    const currentHead = state.head
+    const latest = currentHead?.samples.at(-1)
+    const previous = latest?.turn === turn && latest.step === step
+      ? latest
+      : undefined
+    if (previous !== undefined && bucketsEqual(previous.buckets, buckets)) return state
+    if (previous !== undefined && currentHead !== null) {
+      const samples = [...currentHead.samples]
+      samples[samples.length - 1] = { ...previous, buckets }
+      return { ...state, head: { ...currentHead, samples } }
+    }
+
+    const time = state.step !== null
+      && state.step.turn === turn
+      && state.step.step === step
+      ? state.step.time
+      : event.time
+    const sample = { seq: event.seq, time, turn, step, route: state.route, buckets }
+    const head = state.head !== null && state.head.samples.length < TIMELINE_CHUNK_SIZE
+      ? { ...state.head, samples: [...state.head.samples, sample] }
+      : { samples: [sample], previous: state.head }
+    return { ...state, head }
+  },
+} satisfies ProjectionDefinition<'tokenUsageTimeline', TokenUsageTimelineState>
 
 /**
  * Token-meter's context-occupancy projection unit.

@@ -23,9 +23,11 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 
 ## 会话投影
 
-当组合提供 `ctx.sessionProjections` 时，token-meter 会通过一个可选子 fiber 注册三个单元。
+当组合提供 `ctx.sessionProjections` 时，token-meter 会通过一个可选子 fiber 注册四个单元。
 
 `tokenUsage` 携带完整持久日志中的 `uncachedInputTokens`、`outputTokens`、`cacheReadTokens` 和 `cacheWriteTokens`。即使请求随后失败，用量分片仍会计入；同一 `(turn, step)` 的最终 assistant 消息用量会替换该样本，而不是重复计数。推理仍是输出的一个细分项。只保留单个最新样本，依赖的是会话日志的一条顺序性质：一旦某个更晚的步骤报告了用量，合法日志就绝不会再为更早的步骤报告用量。
+
+`tokenUsageTimeline` 是仅限 Host 的持久投影，每个模型调用 `(turn, step)` 保留一条样本。每条样本保存首次用量事件 seq、匹配的 `step/start` 时间戳、存在前置请求标头时的精确提供方／模型路由，以及四个互斥的提供方 bucket。同一调用的后续累计用量会替换较早样本，但不改变其 seq、时间或路由；请求失败前已上报的用量仍会保留。样本存放在反向链接的定长块中；大型 Host 状态只在 detach 或冷读写回时持久化，不随实时周期检查点反复序列化。该单元没有客户端 wire view，由全局用量报告通过 Host 冷状态读取消费。
 
 `contextPressure` 携带可选的 `pressureTokens`（提供方报告的最新提示词规模，为未缓存输入加缓存读取与写入之和）、可选的 `projectedTokens`，以及来自最新一条 `request/context` 记录的可选 `contextWindow`。提供方报告用量前两个数字都保持缺失；路由适配器未公布容量时容量也保持缺失。输出不计入其中，因此轮次流式输出期间 `pressureTokens` 保持不动，等到下一个请求报告用量时才前进。
 
@@ -33,7 +35,7 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 
 `contextBreakdown` 携带启发式的 `systemTokens`、`toolsTokens` 与 `messageTokens`，描述上下文的组成而非提供方计费规模。envelope 数字在每条 `request/header` 上按后者胜重新计价；消息数字重放 `surface-fold.ts`——也就是 `measure()` 运行的同一个带位置 fold——因此它在每个事件边界上都等于 `measure().surfaceTokens`，压缩会像缩小下一个请求那样缩小它。三个数字都使用测量服务的固定启发式规则，属于估算值：它们加起来不等于 `projectedTokens`——后者的提供方锚点所体现的恰好是这些明细行仍然带着的误差（按「4 字符 ≈ 1 token」计价，CJK 文本与 JSON schema 会被严重低估）。请把它们当作近似的**组成**呈现，而不是总量。
 
-三个单元都使用标准的投影基线、实时帧、seq 高者胜值仓和 JSON 检查点路径。卸载 token-meter 会移除这三个键。不带投影 seam 的组合会保留测量服务的既有行为。
+三个客户端可见单元使用标准投影基线、实时帧、seq 高者胜值仓和 JSON 检查点路径；时间线使用相同 fold 与检查点机制，但没有 wire view。卸载 token-meter 会移除全部四个键。不带投影 seam 的组合会保留测量服务的既有行为。
 
 ### 上下文占用率是刻意为之的近似值
 
@@ -66,3 +68,4 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 - **每次测量都会克隆当前表层**：一致且不可变的快照使读取成为 O(surface)，包括低于阈值的压力检查。
 - **提供方用量只能为完全相同的规范 envelope 复用**：提示词、前缀、工具、提供方、模型或调用配置变更都会有意回退到完整启发式估算。
 - **保守处理缺少源事件 seq 的遗留记录**：没有 `sourceEventSeqs` 的 assistant 消息无法区分提供方输出与 listener 改写，因此 fold 不会声称已知空流或精确分片流。
+- **Host 时间线随模型调用次数增长**：为了让跨会话报告保留日期与精确路由归属，每个 `(turn, step)` 会留下一条紧凑样本。

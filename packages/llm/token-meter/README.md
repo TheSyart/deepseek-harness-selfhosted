@@ -23,9 +23,11 @@ Usage accounting sums disjoint input, cache-read, cache-write, and output bucket
 
 ## Session projections
 
-When the composition provides `ctx.sessionProjections`, token-meter registers three units through an optional child fiber.
+When the composition provides `ctx.sessionProjections`, token-meter registers four units through an optional child fiber.
 
 `tokenUsage` carries the complete durable log's `uncachedInputTokens`, `outputTokens`, `cacheReadTokens`, and `cacheWriteTokens`. Usage chunks are counted even when a request later fails; a final assistant-message usage for the same `(turn, step)` replaces that sample instead of double-counting it. Reasoning remains an output subdivision. The single last-sample slot relies on a session-log ordering property: once a later step reports usage, a legal log never reports usage for an earlier step again.
+
+`tokenUsageTimeline` is a Host-only persisted projection with one sample per model-call `(turn, step)`. Each sample retains the first usage event seq, matching `step/start` timestamp, exact provider/model route when a preceding request header exists, and the four disjoint provider buckets. Later cumulative usage for that call replaces the earlier sample without changing its seq, time, or route; usage reported before a failed request remains. The unit has no client wire view and is consumed through Host cold-state reads by the global usage report.
 
 `contextPressure` carries optional `pressureTokens` — the newest provider-reported prompt size, summing uncached input plus cache reads and writes — optional `projectedTokens`, and optional `contextWindow` from the newest `request/context` record. Both figures stay absent until a provider reports usage; capacity stays absent for a route whose adapter advertises none. Output is excluded, so `pressureTokens` holds still while a turn streams and steps forward when the next request reports its usage.
 
@@ -33,7 +35,7 @@ When the composition provides `ctx.sessionProjections`, token-meter registers th
 
 `contextBreakdown` carries heuristic `systemTokens`, `toolsTokens`, and `messageTokens` — the context's composition rather than its provider-billed size. The envelope figures reprice last-wins on every `request/header`; the message figure replays `surface-fold.ts` — the same positional fold `measure()` runs — so it equals `measure().surfaceTokens` at every event boundary and compaction shrinks it the way it shrinks the next request. All three figures use the measurement service's fixed heuristic and are estimates: they will not sum to `projectedTokens`, whose provider anchor carries exactly the error — CJK text and JSON schemas underprice badly at four characters per token — that the composition rows still contain. Present them as an approximate composition, never as a total.
 
-All three units use the standard projection baseline, live frame, higher-seq-wins store, and JSON checkpoint paths. Unloading token-meter removes all three keys. A composition without the projection seam keeps the measurement service's existing behavior.
+The three client-visible units use the standard projection baseline, live frame, higher-seq-wins store, and JSON checkpoint paths; the timeline uses the same fold machinery without a wire view. Its samples live in reverse-linked bounded chunks, and its large Host state checkpoints at detach or cold-read write-back instead of every periodic live checkpoint. Unloading token-meter removes all four keys. A composition without the projection seam keeps the measurement service's existing behavior.
 
 ### Context occupancy is an approximation, by design
 
@@ -66,3 +68,4 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **Every measurement clones the current surface** — coherent immutable snapshots make reads O(surface), including below-threshold pressure checks.
 - **Provider usage is only reusable for an identical canonical envelope** — prompt, prefix, tools, provider, model, or call-config changes deliberately fall back to full heuristic estimation.
 - **Missing legacy source seqs are handled conservatively** — assistant messages without `sourceEventSeqs` cannot distinguish provider output from listener rewrites, so the fold avoids claiming a known empty or exact chunk stream.
+- **The Host timeline grows with model calls** — one compact sample per `(turn, step)` is retained so cross-session reports can preserve date and exact-route attribution.

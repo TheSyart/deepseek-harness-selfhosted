@@ -47,6 +47,8 @@ export interface ProjectionDefinition<
   key: K
   /** Validates persisted state before it seeds a fold. */
   stateSchema: ZodType<S>
+  /** Persist on periodic checkpoints by default, or only at live-session detach. */
+  checkpoint?: 'periodic' | 'detach'
   /**
    * State for the empty log.
    * @returns the initial state.
@@ -133,6 +135,7 @@ interface ErasedDefinition {
   apply(state: unknown, event: SessionEvent): unknown
   wire: { viewSchema: { parse(value: unknown): unknown }; view(state: unknown): unknown } | undefined
   stateVersion: number
+  checkpoint: 'periodic' | 'detach'
 }
 
 /** Per-session per-unit watermark cache row. */
@@ -209,8 +212,7 @@ export class SessionProjectionRegistry extends Service {
     },
   ): () => void
   /**
-   * Register one host-only unit. Its state is omitted from client snapshots
-   * and always checkpointed like every other unit.
+   * Register one host-only unit. Its state is omitted from client snapshots.
    * @param definition - key, state schema, pure unit functions, and stateVersion.
    * @returns the exact disposer that unregisters this unit.
    */
@@ -236,6 +238,7 @@ export class SessionProjectionRegistry extends Service {
         ? undefined
         : { viewSchema: wire.viewSchema, view: state => wire.view(state as S) },
       stateVersion: definition.stateVersion,
+      checkpoint: definition.checkpoint ?? 'periodic',
     }
     if (!Number.isSafeInteger(definition.stateVersion) || definition.stateVersion < 0) {
       throw new Error(`session projection ${JSON.stringify(definition.key)} stateVersion must be a non-negative integer, got ${String(definition.stateVersion)}`)
@@ -324,11 +327,13 @@ export class SessionProjectionRegistry extends Service {
    * every subsequent snapshot and frame through it (plain JSON by the unit
    * contract, so the clone is total).
    * @param session - the session whose unit states are checkpointed.
+   * @param mode - include every unit, or omit detach-only units at a periodic write.
    * @returns one row per registered key.
    */
-  checkpoint(session: Session): ProjectionCheckpoint {
+  checkpoint(session: Session, mode: 'all' | 'periodic' = 'all'): ProjectionCheckpoint {
     const rows: ProjectionCheckpoint = {}
     for (const registration of this.registrations.values()) {
+      if (mode === 'periodic' && registration.def.checkpoint === 'detach') continue
       const cell = this.cellFor(registration, session)
       rows[registration.def.key] = {
         ver: registration.def.stateVersion,

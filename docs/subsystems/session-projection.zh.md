@@ -27,6 +27,8 @@ interface ProjectionDefinition<
   key: K
   /** Validates persisted state before it seeds a fold. */
   stateSchema: ZodType<S>
+  /** Persist on periodic checkpoints by default, or only at live-session detach. */
+  checkpoint?: 'periodic' | 'detach'
   /**
    * State for the empty log.
    * @returns the initial state.
@@ -130,10 +132,11 @@ The persisted projection cache service. Opens the `session_projcache` domain at 
 cachedSnapshot(meta: SessionHeader): ProjectionSnapshot | undefined
 
 /**
- * Durably checkpoint one live session NOW (both mandatory points call
- * this; tests and carriers may too). The registry cut is snapshotted at
- * this boundary (states are live references), then the whole record is
- * replaced. NOT fail-soft — callers on the fail-soft paths contain it.
+ * Durably checkpoint every projection for one live session NOW. Detach and
+ * explicit carrier calls use this full cut; scheduled checkpoints use the
+ * periodic-only cut. The registry states are snapshotted at this boundary,
+ * then the whole record is replaced. NOT fail-soft — callers on fail-soft
+ * paths contain it.
  * @param session - the live session to checkpoint.
  * @returns resolution after durability and event emission.
  */
@@ -152,6 +155,18 @@ async write(session: Session): Promise<void>
  * @returns the snapshot cut at the stored log end.
  */
 async coldSnapshot(id: SessionId, signal?: AbortSignal): Promise<ProjectionSnapshot>
+
+/**
+ * Restore one Host projection state through the persisted checkpoint and
+ * tail-replay ladder. The returned JSON value is detached from both the
+ * registry fold and the durable cache; an unregistered key returns
+ * `undefined`. Persistence and cancellation failures reject unchanged.
+ * @param id - persisted session to read.
+ * @param key - registered Host or client-visible projection key.
+ * @param signal - optional cancellation for persistence reads.
+ * @returns detached state, or `undefined` when the key is not registered.
+ */
+async coldState<K extends keyof SessionProjectionStateMap>( id: SessionId, key: K, signal?: AbortSignal, ): Promise<SessionProjectionStateMap[K] | undefined>
 ```
 
 Types: [Session](session.zh.md) · [SessionHeader](persistence.zh.md) · [SessionId](core.zh.md)
@@ -176,8 +191,7 @@ Source: [`packages/session/session-projection-cache/src/index.ts`](../../package
 register< K extends keyof SessionProjectionMap, S extends SessionProjectionStateMap[K], >( definition: Omit<ProjectionDefinition<K, S>, 'wire'> & { wire: NonNullable<ProjectionDefinition<K, S>['wire']> }, ): () => void
 
 /**
- * Register one host-only unit. Its state is omitted from client snapshots
- * and always checkpointed like every other unit.
+ * Register one host-only unit. Its state is omitted from client snapshots.
  * @param definition - key, state schema, pure unit functions, and stateVersion.
  * @returns the exact disposer that unregisters this unit.
  */
@@ -222,9 +236,10 @@ snapshot(session: Session): ProjectionSnapshot
  * every subsequent snapshot and frame through it (plain JSON by the unit
  * contract, so the clone is total).
  * @param session - the session whose unit states are checkpointed.
+ * @param mode - include every unit, or omit detach-only units at a periodic write.
  * @returns one row per registered key.
  */
-checkpoint(session: Session): ProjectionCheckpoint
+checkpoint(session: Session, mode: 'all' | 'periodic' = 'all'): ProjectionCheckpoint
 
 /**
  * The stored seq a {@link restore} tail read over `checkpoint` must start

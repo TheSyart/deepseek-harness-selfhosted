@@ -1974,6 +1974,51 @@
       "doc": "docs/subsystems/feedback.md",
       "symbol": "MessageFeedbackDeleteResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "TokenUsageTimelineRoute",
+      "source": "packages/llm/token-meter/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "TokenUsageTimelineBuckets",
+      "source": "packages/llm/token-meter/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "TokenUsageTimelineSample",
+      "source": "packages/llm/token-meter/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "TokenUsageTimelineState",
+      "source": "packages/llm/token-meter/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "TokenUsageBuckets",
+      "source": "packages/llm/token-usage-report/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "TokenUsageRoute",
+      "source": "packages/llm/token-usage-report/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "TokenUsageDay",
+      "source": "packages/llm/token-usage-report/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "TokenUsageReportSnapshot",
+      "source": "packages/llm/token-usage-report/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "TokenUsageReportRequest",
+      "source": "packages/llm/token-usage-report/src/types.ts"
     }
   ]
 }

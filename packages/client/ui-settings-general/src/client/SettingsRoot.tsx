@@ -19,9 +19,20 @@ import {
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
 
+/** Private chart glyph for the product-owned Token usage page. */
+function TokenUsageNavGlyph() {
+  return (
+    <svg className={css.navIcon} width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M2.5 12.8V9.4M6.2 12.8V5.8M9.8 12.8V7.4M13.5 12.8V3.2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M2.5 6.4 6.2 3.8l3.6 1.4 3.7-3" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 /** Nav glyph by section id; unknown ids fall back to the settings gear. */
 function navIcon(id: string) {
   if (id === 'models') return <IconDataOutline16 className={css.navIcon} size={16} />
+  if (id === 'token-usage') return <TokenUsageNavGlyph />
   if (id === 'agent-presets') return <IconAgentPresetOutline16 className={css.navIcon} size={16} />
   if (id === 'plugins') return <IconPersonalizationOutline16 className={css.navIcon} size={16} />
   return <IconSettingsOutline16 className={css.navIcon} size={16} />

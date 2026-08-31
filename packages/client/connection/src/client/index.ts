@@ -65,6 +65,12 @@ export interface ClientTransportHooks {
   /** Transport for generic unary RPC channels (the Typert gateway). */
   fetch: RpcFetch
   /**
+   * Whether this native carrier has the same Host-settings authority as a
+   * loopback page. Only same-process transports with an authenticated sender
+   * may set this flag.
+   */
+  localAuthority?: boolean
+  /**
    * Bundle transport for the module system, present when the carrier also owns
    * bundle bytes (the worker tunnel). Absent in the served web app, whose
    * bundles load over HTTP.
@@ -85,7 +91,7 @@ interface ClientTransportGlobal {
 export interface ConnectionHandle {
   /** Shared api client (fixture or real, decided at boot from the page URL). */
   readonly api: IApiClient
-  /** Whether the current page authority is loopback; non-browser contexts default to true. */
+  /** Whether the page or its native carrier has loopback-equivalent local authority. */
   readonly isLoopback: boolean
   /** Generation-scoped Host facts, including the account home and native path-open capability. */
   readonly hostDescription: HostDescriptionSource
@@ -129,7 +135,8 @@ export function apply(ctx: Context): void {
   }
   const handle: ConnectionHandle = {
     api,
-    isLoopback: pageLocation === undefined || isLoopbackHostname(pageLocation.hostname),
+    isLoopback: transport?.localAuthority
+      ?? (pageLocation === undefined || isLoopbackHostname(pageLocation.hostname)),
     hostDescription: {
       getSnapshot: () => description,
       subscribe: (listener) => {

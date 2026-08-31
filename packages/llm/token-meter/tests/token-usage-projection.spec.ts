@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import TokenMeter, {
+  tokenUsageTimelineSamples,
+  type TokenUsageTimelineState,
+} from '@deepseek-ai/dsh-token-meter'
 import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import type {} from '../src/usage-projection.ts'
@@ -70,6 +73,19 @@ const projected = (ctx: Context, session: Session): TokenUsageProjection => {
   const value = ctx.sessionProjections.snapshot(session).values.tokenUsage
   if (value === undefined) throw new Error('tokenUsage projection is not registered')
   return value
+}
+
+const timelineState = (ctx: Context, session: Session): TokenUsageTimelineState => {
+  const value = ctx.sessionProjections.checkpoint(session).tokenUsageTimeline?.val
+  if (value === undefined) throw new Error('tokenUsageTimeline projection is not registered')
+  return value as TokenUsageTimelineState
+}
+
+function recordRoute(session: Session, provider: string, model: string): void {
+  session.append('request/header', {
+    header: { config: { provider, model } },
+    reason: 'change',
+  })
 }
 
 /**
@@ -242,6 +258,114 @@ describe('tokenUsage session projection', () => {
       cacheReadTokens: 5,
       cacheWriteTokens: 0,
     })
+  })
+})
+
+describe('tokenUsageTimeline host projection', () => {
+  it('keeps exact routes and replaces a step sample without losing its first seq or start time', async () => {
+    vi.useFakeTimers()
+    try {
+      const { ctx, session } = await harness()
+      vi.setSystemTime(1_000)
+      recordRoute(session, 'deepseek', 'deepseek-chat')
+      startStep(session, 1, 1)
+      const firstUsageSeq = usageChunk(session, {
+        inputTokens: 10,
+        outputTokens: 2,
+        cacheReadTokens: 3,
+      }, 1, 1)
+      finalUsage(session, {
+        inputTokens: 14,
+        outputTokens: 5,
+        cacheReadTokens: 8,
+        cacheWriteTokens: 1,
+        reasoningTokens: 4,
+      }, 1, 1, [firstUsageSeq])
+
+      vi.setSystemTime(2_000)
+      recordRoute(session, 'openai', 'gpt-5.6')
+      startStep(session, 1, 2)
+      const failedUsageSeq = usageChunk(session, {
+        inputTokens: 20,
+        outputTokens: 7,
+        cacheWriteTokens: 4,
+      }, 1, 2)
+      session.append('step/end', { turn: 1, step: 2 })
+
+      expect(timelineState(ctx, session)).toEqual({
+        route: { kind: 'model', provider: 'openai', model: 'gpt-5.6' },
+        step: null,
+        head: {
+          samples: [{
+            seq: firstUsageSeq,
+            time: 1_000,
+            turn: 1,
+            step: 1,
+            route: { kind: 'model', provider: 'deepseek', model: 'deepseek-chat' },
+            buckets: {
+              uncachedInputTokens: 14,
+              outputTokens: 5,
+              cacheReadTokens: 8,
+              cacheWriteTokens: 1,
+            },
+          }, {
+            seq: failedUsageSeq,
+            time: 2_000,
+            turn: 1,
+            step: 2,
+            route: { kind: 'model', provider: 'openai', model: 'gpt-5.6' },
+            buckets: {
+              uncachedInputTokens: 20,
+              outputTokens: 7,
+              cacheReadTokens: 0,
+              cacheWriteTokens: 4,
+            },
+          }],
+          previous: null,
+        },
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('records unknown routing and stays out of the client projection snapshot', async () => {
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    usageChunk(session, { inputTokens: 3, outputTokens: 1 }, 1, 1)
+
+    expect(timelineState(ctx, session)).toMatchObject({
+      head: {
+        samples: [{
+          turn: 1,
+          step: 1,
+          route: { kind: 'unknown' },
+          buckets: {
+            uncachedInputTokens: 3,
+            outputTokens: 1,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+          },
+        }],
+      },
+    })
+    expect(ctx.sessionProjections.snapshot(session).values).not.toHaveProperty('tokenUsageTimeline')
+  })
+
+  it('stores long timelines in bounded append-oriented chunks and preserves call order', async () => {
+    const { ctx, session } = await harness()
+    recordRoute(session, 'deepseek', 'deepseek-chat')
+    for (let turn = 1; turn <= 129; turn += 1) {
+      startStep(session, turn, 1)
+      usageChunk(session, { inputTokens: turn, outputTokens: 1 }, turn, 1)
+      session.append('step/end', { turn, step: 1 })
+    }
+
+    const state = timelineState(ctx, session)
+    expect(state.head?.samples).toHaveLength(1)
+    expect(state.head?.previous?.samples).toHaveLength(128)
+    expect([...tokenUsageTimelineSamples(state)].map(sample => sample.turn))
+      .toEqual(Array.from({ length: 129 }, (_, index) => index + 1))
   })
 })
 

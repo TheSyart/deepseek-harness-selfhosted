@@ -426,6 +426,11 @@
         "zod"
       ]
     },
+    "packages/llm/token-usage-report": {
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
     "packages/session/session-checkpoint-policy": {
       "entry": [
         "tests/**/*.spec.ts",

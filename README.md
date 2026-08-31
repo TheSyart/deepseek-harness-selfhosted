@@ -10,6 +10,14 @@ It uses an architecture where **everything is a plugin**, and is powered by [Cor
 
 DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
 
+## ServerOps self-hosted deployment
+
+This repository is the private self-hosted DeepSeek Harness snapshot managed for `dsh.shanchen.space`. [`.serverops/service.json`](.serverops/service.json) is a restricted deployment contract consumed by ServerOps; it contains no credentials, environment variables, or arbitrary shell commands.
+
+The current contract synchronizes the clean source checkout in place, controls `deepseek-harness.service`, and checks `/` after restart. The production unit still runs the packaged runtime under `/opt/deepseek-harness/runtime`, while `/opt/deepseek-harness-src` is the tracked source checkout. Updating this repository does not silently replace that packaged runtime; changing production to a source-built runtime requires an explicit service migration.
+
+ServerOps accepts only fast-forward GitHub updates. Dirty working trees, non-fast-forward history, missing manifests, and failed health checks block or roll back deployment.
+
 ## Run
 
 ### Run from `npm`

@@ -22,6 +22,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
     'cache-test/marks': MarksState
     'cache-test/marks2': Map<string, string>
+    'cache-test/host': MarksState
   }
   interface SessionProjectionMap {
     'cache-test/marks': { marks: string[] }
@@ -51,6 +52,15 @@ const marksUnit = (stateVersion = 1) => ({
   stateVersion,
 }) satisfies ProjectionDefinition<'cache-test/marks', MarksState>
 
+const hostMarksUnit = {
+  key: 'cache-test/host',
+  stateSchema: z.object({ marks: z.array(z.string()) }).nullable(),
+  init: () => null,
+  apply: (state, event) => event.type === 'cache-test/mark' ? event.data : state,
+  stateVersion: 1,
+  checkpoint: 'detach',
+} satisfies ProjectionDefinition<'cache-test/host', MarksState>
+
 /** A persistence double serving readFrom over a fixed per-id stored log (headers stamp createdAt 0). */
 function fakePersistence(logs: Map<string, SessionEvent[]>) {
   const readFrom = vi.fn(async (id: SessionId, fromSeq: number) => {
@@ -73,6 +83,7 @@ interface HarnessOptions {
   config?: { writeEveryEvents: number; writeIntervalMs: number }
   stateVersion?: number
   logs?: Map<string, SessionEvent[]>
+  hostUnit?: boolean
 }
 
 const contexts: Context[] = []
@@ -90,6 +101,7 @@ async function harness(options: HarnessOptions = {}) {
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   ctx.sessionProjections.register(marksUnit(options.stateVersion))
+  if (options.hostUnit === true) ctx.sessionProjections.register(hostMarksUnit)
   const persistence = fakePersistence(logs)
   ctx.provide('sessionPersistence', persistence as never)
   const fiber = await ctx.plugin(SessionProjectionCache, options.config ?? { writeEveryEvents: 100, writeIntervalMs: 60_000 })
@@ -148,6 +160,23 @@ describe('SessionProjectionCache write policy', () => {
     await owner.dispose()
     await settle()
     expect(storedRows(pool, session.id)?.['cache-test/marks']?.val).toEqual({ marks: ['live'] })
+  })
+
+  it('omits detach-only states from periodic writes and includes them at detach', async () => {
+    const { ctx, pool } = await harness({ hostUnit: true })
+    let session: Session | undefined
+    const owner = await ctx.plugin(Object.assign((inner: Context) => {
+      session = inner.sessions.create(SessionId('detach-only'))
+    }, { inject: ['sessions'] }))
+    if (session === undefined) throw new Error('session was not created')
+    mark(session, ['timeline'])
+    endTurn(session)
+    await settle()
+    expect(storedRows(pool, session.id)?.['cache-test/host']).toBeUndefined()
+
+    await owner.dispose()
+    await settle()
+    expect(storedRows(pool, session.id)?.['cache-test/host']?.val).toEqual({ marks: ['timeline'] })
   })
 
   it('flushes when the in-turn event count reaches the configured threshold', async () => {
@@ -265,6 +294,39 @@ describe('SessionProjectionCache cold read', () => {
     // Write-back: the stored row advanced to the served cut.
     expect(storedRows(samePool, id)?.['cache-test/marks'])
       .toEqual({ ver: 1, seq: 3, val: { marks: ['a', 'b'] } })
+  })
+
+  it('returns a Host-only cold state from the same checkpoint and tail replay ladder', async () => {
+    const pool = new MemoryMediaPool()
+    const logs = new Map([['host-only', storedLog([['a'], ['a', 'b']])]])
+    pool.versions.set('session_projcache', 3)
+    pool.media.set('session_projcache', {
+      tables: new Map([['sessions', new Map([['host-only', {
+        identity: { createdAt: 0 },
+        rows: {
+          'cache-test/marks': { ver: 1, seq: 1, val: { marks: ['a'] } },
+          'cache-test/host': { ver: 1, seq: 1, val: { marks: ['a'] } },
+        },
+      }]])]]),
+      global: null,
+    })
+    const { cache, persistence } = await harness({ pool, logs, hostUnit: true })
+
+    await expect(cache.coldState(SessionId('host-only'), 'cache-test/host'))
+      .resolves.toEqual({ marks: ['a', 'b'] })
+    expect(persistence.readFrom).toHaveBeenCalledWith(SessionId('host-only'), 1, undefined)
+    const snapshot = await cache.coldSnapshot(SessionId('host-only'))
+    expect(snapshot.values).not.toHaveProperty('cache-test/host')
+  })
+
+  it('propagates cancellation and missing-log failures through coldState', async () => {
+    const { cache, persistence } = await harness({ hostUnit: true })
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(cache.coldState(SessionId('absent'), 'cache-test/host', controller.signal))
+      .rejects.toThrow('not found')
+    expect(persistence.readFrom).toHaveBeenCalledWith(SessionId('absent'), 0, controller.signal)
   })
 
   it('discards a version-mismatched row and refolds the full log', async () => {

@@ -575,6 +575,24 @@ export interface Config {
 
 Source: [`packages/credentials/credentials-local/src/index.ts:64`](../packages/credentials/credentials-local/src/index.ts)
 
+<a id="deepseek-aidsh-desktop"></a>
+
+## `@deepseek-ai/dsh-desktop`
+
+```ts config-catalog
+/** Plugin config: composed deployment settings. */
+export interface Config {
+  /**
+   * Register the model-visible surface context (the `app:desktop-surface`
+   * prompt section). A deployment composing the desktop rows without a GUI
+   * user can turn it off, so the orientation text would be false.
+   */
+  surfaceContext: boolean
+}
+```
+
+Source: [`packages/bundle/desktop/src/index.ts:26`](../packages/bundle/desktop/src/index.ts)
+
 <a id="deepseek-aidsh-e2b"></a>
 
 ## `@deepseek-ai/dsh-e2b`
@@ -1793,7 +1811,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/session/session-projection-cache/src/index.ts:42`](../packages/session/session-projection-cache/src/index.ts)
+Source: [`packages/session/session-projection-cache/src/index.ts:43`](../packages/session/session-projection-cache/src/index.ts)
 
 <a id="deepseek-aidsh-session-query-sqlite"></a>
 
@@ -2503,7 +2521,23 @@ Source: [`packages/context/tmux-context/src/index.ts:34`](../packages/context/tm
 export type TokenMeterConfig = Record<string, never>
 ```
 
-Source: [`packages/llm/token-meter/src/types.ts:12`](../packages/llm/token-meter/src/types.ts)
+Source: [`packages/llm/token-meter/src/types.ts:13`](../packages/llm/token-meter/src/types.ts)
+
+<a id="deepseek-aidsh-token-usage-report"></a>
+
+## `@deepseek-ai/dsh-token-usage-report`
+
+Requires: `sessions` · `sessionPersistence` · `sessionProjections` · `sessionProjectionCache` · `tokenMeter`
+
+```ts config-catalog
+/** Required limit for concurrent cold-session projection reads. */
+export interface Config {
+  /** Maximum cold-session projection reads executed concurrently. */
+  readonly readConcurrency: number
+}
+```
+
+Source: [`packages/llm/token-usage-report/src/index.ts:25`](../packages/llm/token-usage-report/src/index.ts)
 
 <a id="deepseek-aidsh-tool-bash"></a>
 
@@ -3253,6 +3287,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-settings-token-usage` ([`packages/client/ui-settings-token-usage/src/index.ts`](../packages/client/ui-settings-token-usage/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-sidebar` ([`packages/client/ui-sidebar/src/index.ts`](../packages/client/ui-sidebar/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-skill` ([`packages/client/ui-skill/src/index.ts`](../packages/client/ui-skill/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-subagent` ([`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts))

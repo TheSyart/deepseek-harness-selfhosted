@@ -1,0 +1,79 @@
+/* Shuangwen quick-action strip: one compact row inside the composer dock
+   column (same width derivation as the Todo/Goal/Queue panels), a dimmed
+   posture label plus small chip buttons. Chips are secondary interactive
+   surfaces; no card chrome — the row must read as an ambient aid, not a
+   competing surface. */
+
+.dock {
+  box-sizing: border-box;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+  width: calc(
+    100% -
+    var(--dsh-composer-side-clearance) -
+    var(--dsh-composer-side-clearance) -
+    var(--dsh-composer-dock-inset) -
+    var(--dsh-composer-dock-inset) -
+    var(--dsh-composer-dock-inset) -
+    var(--dsh-composer-dock-inset)
+  );
+  max-width: calc(
+    var(--dsh-composer-card-max-width) -
+    var(--dsh-composer-dock-inset) -
+    var(--dsh-composer-dock-inset) -
+    var(--dsh-composer-dock-inset) -
+    var(--dsh-composer-dock-inset)
+  );
+  padding: 0 4px;
+}
+
+.hint {
+  flex: none;
+  font-family: var(--dsw-font-family);
+  font-size: 12px;
+  line-height: 14px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chip {
+  box-sizing: border-box;
+  flex: none;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  background: var(--dsw-specific-tip);
+  font-family: var(--dsw-font-family);
+  font-size: 12px;
+  line-height: 14px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-state-business-tertiary);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-tertiary);
+  outline-offset: 1px;
+}
+
+.chip:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

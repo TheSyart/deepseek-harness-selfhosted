@@ -4,7 +4,7 @@
  * empty-root composition, and the installation module-fallback healing.
  */
 
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -113,7 +113,7 @@ describe('resolveBundleDir', () => {
     }))
     writeFileSync(join(dir, 'index.js'), '')
     writeFileSync(join(dir, 'cordis.patch.yml'), '[]\n')
-    expect(resolveBundleDir('t', 'sealed-bundle', anchor, profileDir)).toBe(dir)
+    expect(resolveBundleDir('t', 'sealed-bundle', anchor, profileDir)).toBe(realpathSync(dir))
   })
 })
 
@@ -159,6 +159,11 @@ describe('loadProfile', () => {
     }
     expect(readProfileManifest('t', resolveProfileDir('web', home)).dsh?.profile?.bundles)
       .toEqual([...PROFILE_TEMPLATES.web ?? []])
+    expect(PROFILE_TEMPLATES.desktop).toEqual([
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      '@deepseek-ai/dsh-desktop',
+    ])
   })
 
   it('normalizes only the exact installation-owned headless bundle tuple', () => {
@@ -237,6 +242,35 @@ describe('healProfilesModuleFallback', () => {
     healProfilesModuleFallback(anchor, home)
     const before = readlinkSync(join(fallback, 'dep-of-a'))
     expect(before).toContain('dep-of-a')
+  })
+
+  it('follows dependencies from a pnpm-style symlinked package location', () => {
+    const root = tmp()
+    const appDir = join(root, 'app')
+    const packageModules = join(root, 'store', 'bundle', 'node_modules')
+    const bundleDir = join(packageModules, 'bundle-a')
+    mkdirSync(bundleDir, { recursive: true })
+    mkdirSync(join(appDir, 'node_modules'), { recursive: true })
+    writeFileSync(join(appDir, 'package.json'), JSON.stringify({
+      name: 'dsh-app',
+      dependencies: { 'bundle-a': '0.0.0' },
+    }))
+    writeFileSync(join(bundleDir, 'package.json'), JSON.stringify({
+      name: 'bundle-a',
+      version: '0.0.0',
+      dependencies: { 'dep-of-a': '0.0.0' },
+    }))
+    mkdirSync(join(packageModules, 'dep-of-a'), { recursive: true })
+    writeFileSync(join(packageModules, 'dep-of-a', 'package.json'), JSON.stringify({
+      name: 'dep-of-a',
+      version: '0.0.0',
+    }))
+    symlinkSync(bundleDir, join(appDir, 'node_modules', 'bundle-a'), 'junction')
+
+    const home = tmp()
+    healProfilesModuleFallback(join(appDir, 'package.json'), home)
+
+    expect(lstatSync(join(home, 'profiles', 'node_modules', 'dep-of-a')).isSymbolicLink()).toBe(true)
   })
 
   it('throws when a fallback entry is a real directory', () => {

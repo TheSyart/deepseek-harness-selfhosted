@@ -42,6 +42,104 @@ interface TokenSurfaceNode {
 
 Surface order is authoritative; replacement nodes can have higher durable seqs than later positional nodes. The snapshot is immutable and does not grow when the underlying replay fold advances.
 
+## Host usage timeline
+
+The Host-only timeline preserves the minimum attribution needed for cross-session reports without exposing it through client projection frames. Its route is exact when a request header precedes the usage and explicitly unknown otherwise.
+
+```ts type-equiv
+/** Exact provider route attached to one provider-reported usage sample. */
+type TokenUsageTimelineRoute =
+  | { readonly kind: 'model'; readonly provider: string; readonly model: string }
+  | { readonly kind: 'unknown' }
+```
+
+```ts type-equiv
+/** One model call's disjoint provider-reported token buckets. */
+interface TokenUsageTimelineBuckets {
+  readonly uncachedInputTokens: number
+  readonly outputTokens: number
+  readonly cacheReadTokens: number
+  readonly cacheWriteTokens: number
+}
+```
+
+```ts type-equiv
+/** One model call retained by the Host-only timeline projection. */
+interface TokenUsageTimelineSample {
+  /** Seq of the first usage event reported for this turn and step. */
+  readonly seq: number
+  /** Millisecond timestamp of the matching `step/start` event. */
+  readonly time: number
+  readonly turn: number
+  readonly step: number
+  readonly route: TokenUsageTimelineRoute
+  readonly buckets: TokenUsageTimelineBuckets
+}
+```
+
+```ts type-equiv
+/** Persistable Host-only state used to aggregate usage across saved sessions. */
+interface TokenUsageTimelineState {
+  readonly route: TokenUsageTimelineRoute
+  readonly step: { readonly turn: number; readonly step: number; readonly time: number } | null
+  readonly head: TokenUsageTimelineChunk | null
+}
+```
+
+The reverse-linked head stores bounded chunks, keeping live appends local while detach checkpoints retain the complete timeline. The first usage event fixes each sample's seq, step-start time, and route. Later cumulative usage for the same `(turn, step)` replaces only its buckets, including when the request subsequently fails. Consumers compare the first seq with a fork's `header.seedLength` so copied parent history remains owned by the original session.
+
+## Global usage report
+
+The Host report aggregates the timeline across saved and live sessions. Lifetime totals cover all retained usage, while `days` contains non-empty dates within the rolling 365-day window in the browser-requested IANA time zone. Coverage reports cold-session failures explicitly.
+
+```ts type-equiv
+/** Disjoint provider-reported token buckets. */
+interface TokenUsageBuckets {
+  readonly uncachedInputTokens: number
+  readonly cacheReadTokens: number
+  readonly cacheWriteTokens: number
+  readonly outputTokens: number
+}
+```
+
+```ts type-equiv
+/** Exact model route, or unknown when no request header preceded the usage. */
+type TokenUsageRoute =
+  | { readonly kind: 'model'; readonly provider: string; readonly model: string }
+  | { readonly kind: 'unknown' }
+```
+
+```ts type-equiv
+/** One requested-time-zone calendar day with per-route details. */
+interface TokenUsageDay {
+  readonly date: string
+  readonly buckets: TokenUsageBuckets
+  readonly routes: readonly {
+    readonly route: TokenUsageRoute
+    readonly buckets: TokenUsageBuckets
+  }[]
+}
+```
+
+```ts type-equiv
+/** Point-in-time global usage report served to trusted clients. */
+interface TokenUsageReportSnapshot {
+  readonly generatedAt: number
+  readonly timeZone: string
+  readonly window: { readonly from: string; readonly through: string; readonly days: 365 }
+  readonly lifetime: TokenUsageBuckets
+  readonly coverage: { readonly sessionCount: number; readonly failedSessionCount: number }
+  readonly days: readonly TokenUsageDay[]
+}
+```
+
+```ts type-equiv
+/** Browser request for one report grouped in an explicit IANA time zone. */
+interface TokenUsageReportRequest {
+  readonly timeZone: string
+}
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -87,4 +185,25 @@ estimateMessage(message: Message): number
 Types: [EpochHeader](session.md) · [Message](llm-streaming.md) · [Session](session.md)
 
 Source: [`packages/llm/token-meter/src/index.ts`](../../packages/llm/token-meter/src/index.ts)
+
+<a id="ctxtokenusagereport--tokenusagereportservice"></a>
+
+### `ctx.tokenUsageReport` — `TokenUsageReportService`
+
+Host Remote that merges live and persisted session usage.
+
+```ts cordis-catalog
+/**
+ * Merge every persisted and live session into one provider-usage report.
+ * A live session supersedes the same persisted id. Cold failures exclude
+ * only that session and increment coverage; listing and cancellation
+ * failures reject the whole request.
+ * @param request - IANA time zone used for calendar-day grouping.
+ * @param signal - optional caller cancellation.
+ * @returns global lifetime and rolling-365-day usage.
+ */
+@Remote('snapshot') async snapshot( request: TokenUsageReportRequest, signal?: AbortSignal, ): Promise<TokenUsageReportSnapshot>
+```
+
+Source: [`packages/llm/token-usage-report/src/index.ts`](../../packages/llm/token-usage-report/src/index.ts)
 <!-- END GENERATED cordis-surface -->

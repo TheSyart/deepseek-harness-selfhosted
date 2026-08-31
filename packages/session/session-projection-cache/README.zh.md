@@ -9,7 +9,7 @@
 - **每次后台写入都 fail-soft。** 持久写失败只记一条警告并保持缓存陈旧；下一次写入或冷读自愈。两次写之间崩溃的代价是更长的尾部回放，绝不是错误的值。
 - **`ver` 与当前运行单元的 `stateVersion` 不匹配即丢弃，绝不迁移。** 单元递增版本会在读取时使其行失效；该 key 从日志重新折叠。
 - **存储行必须通过当前单元的 `stateSchema`。** 畸形行从零 I/O view 中省略，并被 restore 拒绝，使冷读阶梯从日志重新折叠。
-- **整记录写入。** 每次写入替换该会话的完整检查点（注册表切面始终是完整的），并经无损 JSON 边界快照——违反纯 JSON 约定的单元状态会显式失败并报错。
+- **整记录写入。** 每次写入替换该会话的检查点，并将纳入的行经无损 JSON 边界快照——违反纯 JSON 约定的单元状态会显式失败并报错。周期写入省略声明 `checkpoint: 'detach'` 的单元；detach 与显式 `write(session)` 纳入所有单元。
 - **记录绑定到日志生命周期，而不只是 id。** 每条记录存储其折叠来源的 header 身份（`createdAt`、`cwd`）；每次读取先以活 header 或存储 header 为证验证它，再接受任何行——被删后重建的 id、或缓存幸存而持久化存储被换掉时，无关记录被整体丢弃，绝不播种幻影值。
 - **日志领先，缓存跟随。** 活会话检查点先把缓冲事件持久 flush，缓存行才落地，因此崩溃只会让缓存落后于日志（更长的尾部回放），绝不领先于它。
 
@@ -26,6 +26,8 @@
 
 两个 `Config` 字段均必填（无默认值）：写入节奏是部署选择，没有普适正确值，由 cordis.yml 明示。
 
+具有大型追加式状态的投影可以声明 `checkpoint: 'detach'`。条数、间隔与 `turn/end` 写入会省略该行，避免反复序列化完整历史；会话 detach 与冷读写回仍会持久化它。detach 前崩溃只会让下一次冷读多回放一段权威日志。
+
 ## 列表读（`cachedSnapshot(meta)`）
 
 零 I/O 一档：从身份匹配的存储记录直接 view 客户端值（仅版本与 state schema 均匹配的 key），以 `{asOfSeq, values}` 切面返回——`asOfSeq` 取所服务行的最低水位，客户端在 higher-seq-wins 规则下播种值存储时，陈旧列表块永远压不过更新的推送帧。host-only 行永不返回。无可用客户端行（未知 id、无关生命周期、无可用行）时返回 `undefined`；api-proxy 列表载体将其转为列缺席。
@@ -34,7 +36,9 @@
 
 读取阶梯，正常路径无需加载全量日志：缓存行 → `sessionProjections.restoreFloor`（锚定在最低可用水位之前一个事件的位置）→ 持久化 `readFrom(id, floor)` → `sessionProjections.restore` → 刷新行的 fail-soft 写回。这个锚使缩短的日志（崩溃修复截断）可被证明：越界的行恰好触发一次从 seq 0 的全量重读，而不是把幽灵值当现值服务。无已注册单元时直接服务 `{asOfSeq: -1, values: {}}`，不触碰持久化；无持久日志的会话以 seam 的 `not found` 拒绝。
 
-`write(session)` 是两个必写点共用的同步切面检查点；载体可以直接调用（非 fail-soft——由 fail-soft 包装层负责遏制）。
+`write(session)` 获取显式的全单元检查点，并用于 detach；按 turn/计数/时间间隔调度的写入只获取周期检查点。载体可以直接调用 `write(session)`（非 fail-soft——由 fail-soft 包装层负责遏制）。
+
+`coldState(sessionId, projectionKey, signal?)` 运行同一套身份检查、版本失效、检查点恢复、尾部回放与 fail-soft 写回，再通过 `SessionProjectionStateMap` 选择并返回一个独立的 Host 或客户端可见状态。未注册的 key 返回 `undefined`；持久化与取消错误原样拒绝。这是有意不提供客户端 wire 值的投影所使用的 Host-only 读取路径。
 
 ## 组合
 

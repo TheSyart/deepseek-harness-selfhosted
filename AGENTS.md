@@ -84,6 +84,12 @@ pnpm run demo:acp       # ACP automation server (needs DEEPSEEK_API_KEY)
 
 When required `gh`, `pnpm`, build, test, or generator commands fail because the agent sandbox blocks credentials, network, IPC, file watching, or nested `sandbox-exec`, retry unchanged with the narrowest host escalation before diagnosing authentication or project failure. Require sandbox evidence; never bypass genuine test failures or the product sandbox under test.
 
+### Installed desktop application updates
+
+- A request to build, package, update, or sync code does not authorize replacing `/Applications/DeepSeek Harness.app` as a whole. Treat the installed `Info.plist`, bundle identity and display name, `CFBundleIconFile` and icon assets, executable and frameworks, entitlements, and signing configuration as user-owned; preserve each item unless the user explicitly approves that item's replacement or a full-shell replacement.
+- Build installed code payloads with `pnpm run build:official`; a direct package build omits the official client profile and exposes local-brand fallbacks. Before any mutation, copy the installed application to a timestamped backup outside `/Applications` and Trash, then verify the backup's bundle identifier and version, resolved icon hash, and code signature. When the Electron runtime is compatible, stage from that backup and replace only `Contents/Resources/app` plus individually authorized shell assets; if the runtime or frameworks must change, stop and request approval for a full-shell replacement.
+- Re-sign the staged bundle while retaining required entitlements, install only after staging succeeds, then launch the exact `/Applications` path and verify the icon, provider and settings access, user data, and changed feature. Keep the backup until the user accepts the update; restore it on any regression.
+
 ### Run relevant checks locally
 
 Run checks before pushes via [dsh-pre-push-checks](.agents/skills/dsh-pre-push-checks/SKILL.md); report only commands run. After `gh stack sync`, validate immediately; do not merge before checks pass.
