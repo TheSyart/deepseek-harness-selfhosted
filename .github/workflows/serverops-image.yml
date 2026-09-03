@@ -47,6 +47,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and publish runtime
+        id: image_web
         uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
           context: .
@@ -59,3 +60,38 @@ jobs:
             org.opencontainers.image.source=${{ steps.source.outputs.url }}
           build-args: |
             SOURCE_COMMIT=${{ steps.source.outputs.sha }}
+      - name: Record trusted build proof (web)
+        shell: bash
+        env:
+          SERVICE: web
+          EXPECTED_SHA: ${{ steps.source.outputs.sha }}
+          IMAGE: ghcr.io/thesyart/deepseek-harness-selfhosted
+          DIGEST: ${{ steps.image_web.outputs.digest }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const { execFileSync } = require('node:child_process');
+          const e = process.env;
+          const checkoutSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (!/^[a-f0-9]{40}$/.test(checkoutSha) || checkoutSha !== e.EXPECTED_SHA ||
+              !/^[a-f0-9]{40}$/.test(e.GITHUB_SHA) || !/^sha256:[a-f0-9]{64}$/.test(e.DIGEST) ||
+              !/^[a-z][a-z0-9-]*$/.test(e.SERVICE)) throw new Error('Invalid build proof identity');
+          for (const key of ['GITHUB_RUN_ID', 'GITHUB_RUN_NUMBER', 'GITHUB_RUN_ATTEMPT']) {
+            if (!/^[1-9][0-9]*$/.test(e[key]) || !Number.isSafeInteger(Number(e[key]))) throw new Error('Invalid run identity');
+          }
+          const proof = { version: 1, repository: e.GITHUB_REPOSITORY, workflow: 'serverops-image.yml',
+            runId: Number(e.GITHUB_RUN_ID), runNumber: Number(e.GITHUB_RUN_NUMBER), runAttempt: Number(e.GITHUB_RUN_ATTEMPT),
+            headSha: e.GITHUB_SHA, checkoutSha, service: e.SERVICE, image: e.IMAGE, digest: e.DIGEST };
+          const directory = path.join(e.RUNNER_TEMP, 'serverops-proof-' + e.SERVICE);
+          fs.mkdirSync(directory, { recursive: true });
+          fs.writeFileSync(path.join(directory, 'release.json'), JSON.stringify(proof) + '\n', { mode: 0o600 });
+          NODE
+      - name: Upload trusted build proof (web)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: serverops-image-web-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/serverops-proof-web/release.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
