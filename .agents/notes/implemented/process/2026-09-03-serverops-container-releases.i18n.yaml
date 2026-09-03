@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-03-serverops-container-releases.md
-2026-09-03-serverops-container-releases.md: 4a0a8f2732eb8280567b7258dc1e301c07b8f4d5
-2026-09-03-serverops-container-releases.zh.md: a5a0064bfbf81a65df36dccedd965791d792d65f
+2026-09-03-serverops-container-releases.md: 96fa06a77bd897d76f8f85d6545ec4741c980986
+2026-09-03-serverops-container-releases.zh.md: cfc5d2275175d44b0624e72a7698a3d7d979eba9

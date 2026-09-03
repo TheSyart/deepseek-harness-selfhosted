@@ -15,6 +15,7 @@ export const zh = {
   climax: '来个小高潮',
 }
 
+/** English labels for the writing quick actions. */
 export const en = {
   premiseHint: 'Story starters',
   continueHint: 'Quick continue',

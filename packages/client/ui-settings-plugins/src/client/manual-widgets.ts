@@ -28,9 +28,13 @@ export const RHEOSTAT_PET_KEY = 'dsh.ui.manualWidgets.rheostat-pet.enabled'
 
 /** 宠物脚本与帧图的前端静态地址（apps/web/public/rheostat-pet/）。 */
 export const RHEOSTAT_PET_SCRIPT = '/rheostat-pet/rheostat-pet.js'
+/** Frontend base URL for the pet animation frames. */
 export const RHEOSTAT_PET_FRAMES = '/rheostat-pet/frames/'
 
-/** 开关当前是否打开（存储不可用时视为关闭）。 */
+/**
+ * Read the saved switch state.
+ * @returns Whether enabled; false when browser storage is unavailable.
+ */
 export function isRheostatPetEnabled(): boolean {
   try {
     return localStorage.getItem(RHEOSTAT_PET_KEY) === '1'

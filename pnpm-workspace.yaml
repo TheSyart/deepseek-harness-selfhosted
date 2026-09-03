@@ -19,14 +19,16 @@ packages:
   # Deploy root of the single-exe build: a pure dependency manifest whose
   # closure is what the exe bundles and what the Python runtime distributes.
   - python/sdk-runtime
+  # Production Web CLI closure; isolated from the Python JSON-RPC carrier.
+  - docker/runtime
 
 # Vendored framework packages keep their upstream semver ranges, while local
 # builds must resolve those matching names to this workspace's pinned sources.
 linkWorkspacePackages: true
 
 overrides:
-  '@deepseek-ai/cosmokit': 'link:vendor/cosmokit'
-  '@deepseek-ai/schemastery': 'link:vendor/schemastery'
+  '@deepseek-ai/cosmokit': 'workspace:*'
+  '@deepseek-ai/schemastery': 'workspace:*'
 
 peerDependencyRules:
   allowedVersions:

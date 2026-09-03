@@ -14,7 +14,9 @@ DeepSeek Harness 目前处于 _开发者预览_ 阶段，正在快速迭代。**
 
 本仓库是 `dsh.shanchen.space` 使用的私有 DeepSeek Harness 自托管快照。[`.serverops/service.json`](.serverops/service.json) 是 ServerOps 读取的受限部署契约，其中不包含凭据、环境变量或任意 Shell 命令。
 
-v2 镜像清单声明了 3080 端口的 Web 服务、`/` 健康检查，以及完整 Harness 主目录、共享 agent 配置和工作区的逻辑挂载。[容器参考](docker/README.zh.md) 说明了从源码构建的 Node 运行时、外部数据、私有 GHCR 工作流及现有源码依赖阻塞。
+v2 镜像清单声明了 3080 端口的 Web 服务、`/` 健康检查，以及完整 Harness 主目录、共享 agent 配置和工作区的逻辑挂载。[容器参考](docker/README.zh.md) 说明了从源码构建的 Node 运行时、外部数据、私有 GHCR 工作流及验证边界。本地源码构建和打包 Web 启动已在 macOS 验证；这不代表 Linux 镜像就绪或生产迁移完成。
+
+源码保留 `shuangwen` 写作 preset 及其[快捷操作插件](packages/client/ui-shuangwen/README.zh.md)。默认 Web 组装未安装或挂载该插件；构建成功不会让快捷条自动出现在默认界面。宠物手动开关组件同样未由默认插件设置组装挂载。
 
 ServerOps 负责源码验证、digest 选择、备份和版本切换。CI 只构建镜像，不访问生产环境或已安装的 macOS 应用。
 

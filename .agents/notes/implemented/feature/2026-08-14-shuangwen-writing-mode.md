@@ -10,7 +10,7 @@ The Web GUI composes every session from coding-oriented agent presets (`standard
 
 ## Decision
 
-The mode is two pieces, each on the plane that owns it.
+The mode is two pieces, each on the plane that owns it. This self-hosted snapshot contains the preset and plugin source, but the default Web composition does not install or mount `ui-shuangwen`; deployments must compose the strip explicitly, and source presence or a successful build does not establish that it is enabled.
 
 ### The shipped preset `shuangwen` owns the model behavior
 
@@ -36,7 +36,7 @@ The strip hides itself while the session is removed, a turn is running, the inpu
 ## Consequences
 
 - The preset roster and its picker goldens change shape: `apps/web/tests/snapshots/agent-preset-selection/` and `apps/web/tests/snapshots/agent-preset-authoring/` were refreshed in the same change (menu, hero, and settings-section listings now include 爽文创作 between 标准模式 and PTC 模式).
-- The browser plugin table is a boot-time scan ([client modules](../../../docs/subsystems/README.md)): `@deepseek-ai/dsh-client-modules` caches package metadata per name, so a running `dsh web` must restart to serve the new `dsh.client` row and its `lib/client.js` — a page refresh alone cannot discover a plugin added after boot.
+- The browser plugin table is a boot-time scan ([client modules](../../../../docs/subsystems/README.md)): `@deepseek-ai/dsh-client-modules` caches package metadata per name, so a running `dsh web` must restart to serve the new `dsh.client` row and its `lib/client.js` — a page refresh alone cannot discover a plugin added after boot.
 - The strip serves exactly the shipped `shuangwen` id; a locally authored copy under another id gets no strip (recorded in the package README's known limitations).
 
 ## Verification

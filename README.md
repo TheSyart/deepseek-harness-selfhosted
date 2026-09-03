@@ -14,7 +14,9 @@ DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. *
 
 This repository is the private self-hosted DeepSeek Harness snapshot managed for `dsh.shanchen.space`. [`.serverops/service.json`](.serverops/service.json) is a restricted deployment contract consumed by ServerOps; it contains no credentials, environment variables, or arbitrary shell commands.
 
-The v2 image manifest declares a Web service on port 3080 with `/` health checks and symbolic mounts for the complete Harness home, shared agent configuration and workspace. The [container reference](docker/README.md) documents the source-built Node runtime, external data, private GHCR workflow and the existing source dependency blocker.
+The v2 image manifest declares a Web service on port 3080 with `/` health checks and symbolic mounts for the complete Harness home, shared agent configuration and workspace. The [container reference](docker/README.md) documents the source-built Node runtime, external data, private GHCR workflow and verification limits. Local source build and packaged Web startup have been verified on macOS; this does not establish Linux image readiness or a production migration.
+
+The `shuangwen` writing preset and its [quick-action plugin](packages/client/ui-shuangwen/README.md) remain in the source. The default Web composition does not install or mount that plugin; a successful build does not make its strip available in the default UI. The manual pet-switch component is likewise not mounted by the default plugin-settings composition.
 
 ServerOps owns source verification, digest selection, backups and release switching. CI only builds images; it does not access production or the installed macOS application.
 

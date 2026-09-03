@@ -17,10 +17,11 @@ Indirectly, through the `shuangwen` preset's persona (owned by `dsh-persona`): t
 
 #### KV Cache effect
 
-None — browser-side presentation only; no model-visible text originates here.
+Staging a chip changes only the draft. Submitting it appends an ordinary user message to the conversation; the selected preset owns the system prompt, which the strip does not rewrite.
 
 ## Known Limitations and Deferred Work
 
+- **Not enabled by the default Web composition** — this snapshot includes the preset and builds this plugin, but `dsh-web-app` does not install or mount it. A deployment must explicitly compose it before the strip appears; build and component tests do not prove that integration.
 - **The preset id is hardcoded** — the strip serves exactly the shipped `shuangwen` preset; a locally authored copy under another id gets no strip.
 - **The strip yields the floor while busy** — a running turn or a non-empty draft hides the chips, so a chapter must finish before the next one-click continue appears.
 - **The starter set is static** — three fixed premises; a user can still type any 开书 prompt by hand.

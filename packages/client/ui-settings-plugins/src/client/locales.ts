@@ -3,6 +3,8 @@
 /** Locale keys these surfaces render. */
 export type PluginsSettingsLocaleKey =
   | 'nav' | 'title' | 'intro' | 'tabs' | 'configurableTab' | 'empty'
+  | 'manualTabIntro' | 'rheostatPetTitle' | 'rheostatPetDescription'
+  | 'rheostatPetOn' | 'rheostatPetOff' | 'rheostatPetToggleLabel' | 'rheostatPetFailed'
   | 'overridden' | 'reset' | 'readOnly' | 'expand' | 'collapse'
   | 'save' | 'saving' | 'discard' | 'unsaved' | 'saveFailed' | 'invalidNumber'
   | 'bashTitle' | 'bashDescription' | 'bashTimeoutMs' | 'bashTimeoutMsHint'
@@ -19,6 +21,13 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   intro: 'Configure and inspect the plugins installed in this deployment.',
   tabs: 'Plugin views',
   configurableTab: 'Plugin configuration',
+  manualTabIntro: 'These interface switches are saved in this browser.',
+  rheostatPetTitle: 'Rheostat pet',
+  rheostatPetDescription: 'Show a floating pet in the interface.',
+  rheostatPetOn: 'On',
+  rheostatPetOff: 'Off',
+  rheostatPetToggleLabel: 'Show rheostat pet',
+  rheostatPetFailed: 'The pet could not be loaded. Try again.',
   empty: 'This deployment exposes no plugin settings.',
   overridden: 'Overridden',
   reset: 'Reset to default',
@@ -60,6 +69,13 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   intro: '配置和查看本部署已安装的插件。',
   tabs: '插件视图',
   configurableTab: '插件配置',
+  manualTabIntro: '这些界面开关保存在当前浏览器中。',
+  rheostatPetTitle: '滑动变祖器宠物',
+  rheostatPetDescription: '在界面中显示悬浮宠物。',
+  rheostatPetOn: '已开启',
+  rheostatPetOff: '已关闭',
+  rheostatPetToggleLabel: '显示滑动变祖器宠物',
+  rheostatPetFailed: '宠物加载失败，请重试。',
   empty: '本部署没有开放任何插件设置。',
   overridden: '已覆盖',
   reset: '恢复默认',
