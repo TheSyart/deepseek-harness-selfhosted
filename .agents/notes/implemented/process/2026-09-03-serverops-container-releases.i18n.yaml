@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-03-serverops-container-releases.md
+2026-09-03-serverops-container-releases.md: 4a0a8f2732eb8280567b7258dc1e301c07b8f4d5
+2026-09-03-serverops-container-releases.zh.md: a5a0064bfbf81a65df36dccedd965791d792d65f

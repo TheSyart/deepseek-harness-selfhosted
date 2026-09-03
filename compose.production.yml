@@ -1,0 +1,35 @@
+# Reference only; ServerOps renders production Compose from root-approved policy.
+services:
+  web:
+    image: ${HARNESS_IMAGE:?Set the private GHCR image with a verified digest}
+    platform: linux/amd64
+    user: "${HARNESS_UID:-1000}:${HARNESS_GID:-1000}"
+    init: true
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - "127.0.0.1:${HARNESS_PORT:-3080}:3080"
+    env_file:
+      - ${HARNESS_ENV_FILE:?Set an absolute path to the external runtime env file}
+    volumes:
+      - type: bind
+        source: ${HARNESS_CONFIG_DIR:?Set the existing Harness home directory}
+        target: /app/data/config
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${HARNESS_AGENTS_DIR:?Set the shared agent configuration directory}
+        target: /app/data/agents
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${HARNESS_WORKSPACE_DIR:?Set the preserved workspace directory}
+        target: /app/data/workspace
+        bind:
+          create_host_path: false
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

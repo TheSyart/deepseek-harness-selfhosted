@@ -1,0 +1,11 @@
+# Applied after the persistent profile patch; only the container transport is fixed here.
+- id: webserver
+  config:
+    host: 0.0.0.0
+    port: 3080
+- id: web-runtime
+  config:
+    openBrowser: false
+    printUrl: true
+    surfaceContext: true
+    trustedHosts: !!js (process.env.DSH_TRUSTED_HOSTS || '').split(',').map(value => value.trim()).filter(Boolean)

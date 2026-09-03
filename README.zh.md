@@ -14,9 +14,9 @@ DeepSeek Harness 目前处于 _开发者预览_ 阶段，正在快速迭代。**
 
 本仓库是 `dsh.shanchen.space` 使用的私有 DeepSeek Harness 自托管快照。[`.serverops/service.json`](.serverops/service.json) 是 ServerOps 读取的受限部署契约，其中不包含凭据、环境变量或任意 Shell 命令。
 
-当前清单负责原目录同步干净的源码 checkout、控制 `deepseek-harness.service`，并在重启后请求 `/` 完成健康检查。生产单元目前仍运行 `/opt/deepseek-harness/runtime` 下的打包版本，`/opt/deepseek-harness-src` 是受跟踪的源码目录；同步本仓库不会暗中替换打包运行时。若改为直接运行源码构建产物，必须单独迁移 systemd 服务。
+v2 镜像清单声明了 3080 端口的 Web 服务、`/` 健康检查，以及完整 Harness 主目录、共享 agent 配置和工作区的逻辑挂载。[容器参考](docker/README.zh.md) 说明了从源码构建的 Node 运行时、外部数据、私有 GHCR 工作流及现有源码依赖阻塞。
 
-ServerOps 只接受 GitHub fast-forward 更新。工作树不干净、历史非快进、清单缺失或健康检查失败时，发布会被拒绝或回退。
+ServerOps 负责源码验证、digest 选择、备份和版本切换。CI 只构建镜像，不访问生产环境或已安装的 macOS 应用。
 
 <a id="run"></a>
 

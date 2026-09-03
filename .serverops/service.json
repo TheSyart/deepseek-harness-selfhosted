@@ -1,18 +1,32 @@
 {
-  "version": 1,
+  "version": 2,
   "build": {
-    "kind": "none"
-  },
-  "publish": {
-    "mode": "in_place"
+    "kind": "image",
+    "workflow": "serverops-image.yml"
   },
   "runtime": {
-    "kind": "systemd",
-    "unit": "deepseek-harness.service"
-  },
-  "health": {
-    "kind": "http",
-    "path": "/",
-    "timeoutSeconds": 5
+    "kind": "compose",
+    "services": [
+      {
+        "name": "web",
+        "image": "ghcr.io/thesyart/deepseek-harness-selfhosted",
+        "port": 3080,
+        "healthPath": "/",
+        "data": [
+          {
+            "name": "config",
+            "target": "/app/data/config"
+          },
+          {
+            "name": "agents",
+            "target": "/app/data/agents"
+          },
+          {
+            "name": "workspace",
+            "target": "/app/data/workspace"
+          }
+        ]
+      }
+    ]
   }
 }
