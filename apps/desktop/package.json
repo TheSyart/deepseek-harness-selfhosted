@@ -63,12 +63,12 @@
     "@deepseek-ai/dsh-web-app": "workspace:^",
     "@deepseek-ai/dsh-workflow": "workspace:^",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "~18.3.1",
-    "@types/react-dom": "~18.3.0",
+    "@types/react-dom": "~19.2.4",
     "@vitejs/plugin-react": "^4.0.0",
     "electron": "^37.0.0",
     "sharp": "^0.35.3",
