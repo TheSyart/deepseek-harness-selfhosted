@@ -1,0 +1,79 @@
+{
+  "name": "@deepseek-ai/dsh-desktop-app",
+  "description": "DeepSeek Harness Electron desktop application: main-process assembly (desktop profile boot + BrowserWindow), IPC preload, and the renderer entry over the dsh-client-web shell",
+  "version": "0.1.1-rc.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "apps/desktop"
+  },
+  "type": "module",
+  "main": "lib/main.js",
+  "files": [
+    "lib/*.js",
+    "dist",
+    "!dist/**/*.map",
+    "resources"
+  ],
+  "scripts": {
+    "build": "pnpm run build:lib && pnpm run build:web",
+    "build:icon": "node scripts/generate-icon.mjs",
+    "build:lib": "tsc -b tsconfig.host.json && tsdown",
+    "build:web": "vite build",
+    "start": "electron ."
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/cordis-plugin-group": "workspace:^",
+    "@deepseek-ai/cordis-plugin-hmr": "workspace:^",
+    "@deepseek-ai/cordis-plugin-include": "workspace:^",
+    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
+    "@deepseek-ai/cordis-plugin-timer": "workspace:^",
+    "@deepseek-ai/dsh": "workspace:^",
+    "@deepseek-ai/dsh-anonymous-user-id": "workspace:^",
+    "@deepseek-ai/dsh-app-boot": "workspace:^",
+    "@deepseek-ai/dsh-atomic-write": "workspace:^",
+    "@deepseek-ai/dsh-authorization": "workspace:^",
+    "@deepseek-ai/dsh-base": "workspace:^",
+    "@deepseek-ai/dsh-bash-local": "workspace:^",
+    "@deepseek-ai/dsh-client-connection": "workspace:^",
+    "@deepseek-ai/dsh-client-web": "workspace:^",
+    "@deepseek-ai/dsh-code-runtime": "workspace:^",
+    "@deepseek-ai/dsh-compaction": "workspace:^",
+    "@deepseek-ai/dsh-desktop": "workspace:^",
+    "@deepseek-ai/dsh-fs": "workspace:^",
+    "@deepseek-ai/dsh-home-paths": "workspace:^",
+    "@deepseek-ai/dsh-host-apiproxy": "workspace:^",
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-launch-environment": "workspace:^",
+    "@deepseek-ai/dsh-output-retention": "workspace:^",
+    "@deepseek-ai/dsh-sandbox": "workspace:^",
+    "@deepseek-ai/dsh-scope": "workspace:^",
+    "@deepseek-ai/dsh-session-telemetry": "workspace:^",
+    "@deepseek-ai/dsh-session-title-llm": "workspace:^",
+    "@deepseek-ai/dsh-shell": "workspace:^",
+    "@deepseek-ai/dsh-spill": "workspace:^",
+    "@deepseek-ai/dsh-subagent-in-process-driver": "workspace:^",
+    "@deepseek-ai/dsh-system-prompt": "workspace:^",
+    "@deepseek-ai/dsh-timeout": "workspace:^",
+    "@deepseek-ai/dsh-web-app": "workspace:^",
+    "@deepseek-ai/dsh-workflow": "workspace:^",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "electron": "^37.0.0",
+    "sharp": "^0.35.3",
+    "typescript": "^6.0.3",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.8"
+  }
+}

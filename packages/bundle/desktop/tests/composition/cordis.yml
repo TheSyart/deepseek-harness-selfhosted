@@ -1,0 +1,17 @@
+# Real-composition fixture for the desktop bundle's transport rows: the
+# desktop-runtime facade satisfies the modules/connection node halves'
+# webServer inject, and the bridge row disables itself without the
+# app-assembly desktopStartup service. The test provides apiProxy (an
+# external gateway) and desktopStartup (an external Electron surface) stubs.
+- id: desktop-runtime
+  name: '@deepseek-ai/dsh-desktop'
+- id: desktop-bridge
+  name: '@deepseek-ai/dsh-desktop/startup'
+  inject: [desktopStartup, clientModules, apiProxy, connection]
+  disabled: !!js ctx.get('desktopStartup') === undefined
+- id: modules
+  name: '@deepseek-ai/dsh-client-modules'
+- id: connection
+  name: '@deepseek-ai/dsh-client-connection'
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'

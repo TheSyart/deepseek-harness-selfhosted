@@ -42,6 +42,104 @@ interface TokenSurfaceNode {
 
 表层顺序具有权威性；替换节点的持久 seq 可能高于位置排在其后的节点。该快照不可变，不会随底层回放折叠推进而增长。
 
+## Host 用量时间线
+
+Host-only 时间线保留跨会话报告所需的最小归属信息，但不通过客户端投影帧暴露。用量之前存在请求标头时，路由是精确的；否则会明确标为未知。
+
+```ts type-equiv
+/** Exact provider route attached to one provider-reported usage sample. */
+type TokenUsageTimelineRoute =
+  | { readonly kind: 'model'; readonly provider: string; readonly model: string }
+  | { readonly kind: 'unknown' }
+```
+
+```ts type-equiv
+/** One model call's disjoint provider-reported token buckets. */
+interface TokenUsageTimelineBuckets {
+  readonly uncachedInputTokens: number
+  readonly outputTokens: number
+  readonly cacheReadTokens: number
+  readonly cacheWriteTokens: number
+}
+```
+
+```ts type-equiv
+/** One model call retained by the Host-only timeline projection. */
+interface TokenUsageTimelineSample {
+  /** Seq of the first usage event reported for this turn and step. */
+  readonly seq: number
+  /** Millisecond timestamp of the matching `step/start` event. */
+  readonly time: number
+  readonly turn: number
+  readonly step: number
+  readonly route: TokenUsageTimelineRoute
+  readonly buckets: TokenUsageTimelineBuckets
+}
+```
+
+```ts type-equiv
+/** Persistable Host-only state used to aggregate usage across saved sessions. */
+interface TokenUsageTimelineState {
+  readonly route: TokenUsageTimelineRoute
+  readonly step: { readonly turn: number; readonly step: number; readonly time: number } | null
+  readonly head: TokenUsageTimelineChunk | null
+}
+```
+
+反向链表头使用有界分块保存数据，使实时追加只改动局部分块，而 detach 检查点仍保留完整时间线。首次用量事件会固定每条样本的 seq、步骤开始时间与路由。同一 `(turn, step)` 的后续累计用量只替换其 bucket，包括请求随后失败的情况。消费方把首次 seq 与分叉的 `header.seedLength` 比较，使复制的父历史仍由原始会话拥有。
+
+## 全局用量报告
+
+Host 报告汇总已保存会话与实时会话的时间线。Lifetime 总量覆盖全部保留的用量；`days` 仅包含按浏览器请求的 IANA 时区划分、位于滚动 365 天窗口内的非空日期。覆盖情况会明确报告冷会话读取失败。
+
+```ts type-equiv
+/** Disjoint provider-reported token buckets. */
+interface TokenUsageBuckets {
+  readonly uncachedInputTokens: number
+  readonly cacheReadTokens: number
+  readonly cacheWriteTokens: number
+  readonly outputTokens: number
+}
+```
+
+```ts type-equiv
+/** Exact model route, or unknown when no request header preceded the usage. */
+type TokenUsageRoute =
+  | { readonly kind: 'model'; readonly provider: string; readonly model: string }
+  | { readonly kind: 'unknown' }
+```
+
+```ts type-equiv
+/** One requested-time-zone calendar day with per-route details. */
+interface TokenUsageDay {
+  readonly date: string
+  readonly buckets: TokenUsageBuckets
+  readonly routes: readonly {
+    readonly route: TokenUsageRoute
+    readonly buckets: TokenUsageBuckets
+  }[]
+}
+```
+
+```ts type-equiv
+/** Point-in-time global usage report served to trusted clients. */
+interface TokenUsageReportSnapshot {
+  readonly generatedAt: number
+  readonly timeZone: string
+  readonly window: { readonly from: string; readonly through: string; readonly days: 365 }
+  readonly lifetime: TokenUsageBuckets
+  readonly coverage: { readonly sessionCount: number; readonly failedSessionCount: number }
+  readonly days: readonly TokenUsageDay[]
+}
+```
+
+```ts type-equiv
+/** Browser request for one report grouped in an explicit IANA time zone. */
+interface TokenUsageReportRequest {
+  readonly timeZone: string
+}
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -87,4 +185,25 @@ estimateMessage(message: Message): number
 Types: [EpochHeader](session.zh.md) · [Message](llm-streaming.zh.md) · [Session](session.zh.md)
 
 Source: [`packages/llm/token-meter/src/index.ts`](../../packages/llm/token-meter/src/index.ts)
+
+<a id="ctxtokenusagereport--tokenusagereportservice"></a>
+
+### `ctx.tokenUsageReport` — `TokenUsageReportService`
+
+Host Remote that merges live and persisted session usage.
+
+```ts cordis-catalog
+/**
+ * Merge every persisted and live session into one provider-usage report.
+ * A live session supersedes the same persisted id. Cold failures exclude
+ * only that session and increment coverage; listing and cancellation
+ * failures reject the whole request.
+ * @param request - IANA time zone used for calendar-day grouping.
+ * @param signal - optional caller cancellation.
+ * @returns global lifetime and rolling-365-day usage.
+ */
+@Remote('snapshot') async snapshot( request: TokenUsageReportRequest, signal?: AbortSignal, ): Promise<TokenUsageReportSnapshot>
+```
+
+Source: [`packages/llm/token-usage-report/src/index.ts`](../../packages/llm/token-usage-report/src/index.ts)
 <!-- END GENERATED cordis-surface -->

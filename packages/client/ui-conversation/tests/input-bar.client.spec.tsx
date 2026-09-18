@@ -676,7 +676,7 @@ describe('running and lock semantics', () => {
     })
     expect(textarea.disabled).toBe(true)
     expect(textarea.placeholder).toBe('父会话已离线，无法继续发送；仍可停止当前运行')
-    expect((view.getByLabelText('命令') as HTMLButtonElement).disabled).toBe(true)
+    expect((view.getByLabelText('添加内容') as HTMLButtonElement).disabled).toBe(true)
     expect(button.getAttribute('aria-label')).toBe('发送消息')
     expect(button.disabled).toBe(true)
     expect(interruptButton?.disabled).toBe(false)
@@ -724,7 +724,7 @@ describe('running and lock semantics', () => {
     const { textarea, view } = bench({ disabled: true })
     expect(textarea.disabled).toBe(true)
     expect(textarea.placeholder).toBe('会话不可用')
-    expect((view.getByLabelText('命令') as HTMLButtonElement).disabled).toBe(true)
+    expect((view.getByLabelText('添加内容') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('idle primary sends and disables on empty draft', () => {
@@ -1081,7 +1081,7 @@ describe('running and lock semantics', () => {
     expect(textarea.readOnly).toBe(true)
     expect(textarea.getAttribute('aria-haspopup')).toBe('menu')
     expect(textarea.getAttribute('aria-expanded')).toBe('false')
-    expect((view.getByLabelText('命令') as HTMLButtonElement).disabled).toBe(true)
+    expect((view.getByLabelText('添加内容') as HTMLButtonElement).disabled).toBe(true)
 
     fireEvent.click(textarea)
     fireEvent.keyDown(textarea, { key: 'Enter' })
@@ -1469,9 +1469,8 @@ describe('strips and variants', () => {
 })
 
 describe('command launcher chrome and control seats', () => {
-  it('renders the command launcher; the Access chip is absent without the permissions projection; the control seats render EMPTY without entries', () => {
+  it('opens an add-content menu with commands and photo intake; the other control seats stay empty without entries', () => {
     const { view, slotCalls } = bench()
-    expect(view.getByLabelText('命令')).toBeTruthy()
     // Capability absent (no projection value): the chip renders nothing.
     expect(view.queryByLabelText(/^访问模式/)).toBeNull()
     // Every seat dispatched, nothing rendered.
@@ -1480,18 +1479,38 @@ describe('command launcher chrome and control seats', () => {
     ])
     expect(view.queryByLabelText('Plan mode')).toBeNull()
     expect(view.queryByLabelText('Model')).toBeNull()
+    fireEvent.click(view.getByLabelText('添加内容'))
+    expect(view.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['命令', '添加照片'])
   })
 
   it('passes the textarea selection to the command menu launcher and reflects its expanded state', () => {
     const toggleCommandMenu = vi.fn()
     const { view, textarea, menuLauncher } = bench({ draft: 'draft text', toggleCommandMenu })
     textarea.setSelectionRange(2, 7)
-    const launcher = view.getByLabelText('命令')
+    const launcher = view.getByLabelText('添加内容')
     expect(launcher.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(launcher)
+    fireEvent.click(view.getByRole('menuitem', { name: '命令' }))
     expect(toggleCommandMenu).toHaveBeenCalledExactlyOnceWith({ start: 2, end: 7 })
     act(() => { menuLauncher.set('command') })
     expect(launcher.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('opens the native image picker and sends selected files through the existing intake path', () => {
+    const addImages = vi.fn(() => null)
+    const { view } = bench({ addImages })
+    const picker = view.container.querySelector<HTMLInputElement>('input[type="file"]')
+    expect(picker?.accept).toBe('image/png,image/jpeg,image/webp,image/gif')
+    expect(picker?.multiple).toBe(true)
+    const clickPicker = vi.spyOn(picker!, 'click')
+
+    fireEvent.click(view.getByLabelText('添加内容'))
+    fireEvent.click(view.getByRole('menuitem', { name: '添加照片' }))
+    expect(clickPicker).toHaveBeenCalledOnce()
+
+    const image = new File(['png'], 'selected.png', { type: 'image/png' })
+    fireEvent.change(picker!, { target: { files: [image] } })
+    expect(addImages).toHaveBeenCalledExactlyOnceWith([image])
   })
 
   it('the Access chip renders the projection value and submits a non-Full-access pick directly', async () => {
@@ -1636,7 +1655,7 @@ describe('command launcher chrome and control seats', () => {
   it('disabled locks the Access chip and command launcher (running does not)', () => {
     const permissions = { options: [{ value: 'workspace-write', name: 'workspace-write' }], currentValue: 'workspace-write' }
     const { view } = bench({ disabled: true, permissions })
-    expect((view.getByLabelText('命令') as HTMLButtonElement).disabled).toBe(true)
+    expect((view.getByLabelText('添加内容') as HTMLButtonElement).disabled).toBe(true)
     expect((view.getByLabelText(/^访问模式/) as HTMLButtonElement).disabled).toBe(true)
     cleanup()
     const live = bench({ running: true, permissions })

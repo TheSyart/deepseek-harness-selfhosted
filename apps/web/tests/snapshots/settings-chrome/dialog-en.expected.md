@@ -7,6 +7,7 @@
     - button "Models":
       - img
       - text: Models
+    - button "Token usage"
     - button "Plugins":
       - img
       - text: Plugins

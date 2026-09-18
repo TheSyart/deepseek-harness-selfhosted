@@ -124,6 +124,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns isolated per-session replay folds; pressure consumers share immutable revisioned measurements.',
   },
   {
+    key: 'tokenUsageReport',
+    pkg: 'token-usage-report',
+    title: 'Global provider usage report',
+    mode: 'core',
+    consumers: ['api-remotes'],
+    note: 'Aggregates Host-only session timelines into a time-zone-aware Remote snapshot for trusted clients.',
+  },
+  {
     key: 'toolResultPruner',
     pkg: 'compaction-tool-result-pruner',
     title: 'Model-free tool-result pruning',
@@ -538,6 +546,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     consumers: ['connection', 'modules', 'hmr'],
     note: 'Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes.',
+  },
+  {
+    key: 'desktopStartup',
+    pkg: 'desktop',
+    title: 'Electron desktop startup values',
+    mode: 'core',
+    note: 'The Electron app assembly provides the main-process IPC surface and sender fence before the desktop bundle mounts; the bridge consumes those values without importing Electron.',
   },
   {
     key: 'clientModules',

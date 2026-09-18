@@ -24,7 +24,7 @@
 
 import { createRequire } from 'node:module'
 import {
-  existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync,
+  existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
@@ -114,6 +114,7 @@ export function resolveProfileDir(name: string, home: string = resolveDshHome())
 export const PROFILE_TEMPLATES: Record<string, readonly string[]> = {
   web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
   headless: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
+  desktop: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-desktop'],
 }
 
 /** Installation-owned bundle tuples normalized to the shipped template. */
@@ -324,7 +325,7 @@ function packageDirFromAnchor(anchor: string, packageName: string): string | und
   /* v8 ignore next */
   for (const searchPath of createRequire(anchor).resolve.paths(packageName) ?? []) {
     const candidate = join(searchPath, packageName)
-    if (existsSync(join(candidate, 'package.json'))) return candidate
+    if (existsSync(join(candidate, 'package.json'))) return realpathSync(candidate)
   }
   return undefined
 }

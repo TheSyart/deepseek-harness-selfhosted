@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "lib/types",
+    "jsx": "react-jsx",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
+  },
+  "files": [
+    "src/desktop-api.ts",
+    "src/renderer/main.ts",
+    "src/renderer/node-module-stub.ts",
+    "src/renderer/transport.ts",
+    "tests/transport.client.spec.ts"
+  ],
+  "references": [
+    { "path": "../../packages/bundle/desktop" },
+    { "path": "../../packages/client/connection/tsconfig.client.json" },
+    { "path": "../../packages/client/modules" },
+    { "path": "../../packages/client/web" },
+    { "path": "../../packages/host/apiproxy" }
+  ]
+}

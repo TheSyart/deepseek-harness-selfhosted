@@ -678,6 +678,23 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'desktopStartup',
+    summary: 'What the app assembly provides as `desktopStartup`: the Electron surface and the sender fence.',
+    description: 'What the app assembly provides as `desktopStartup`: the Electron surface and the sender fence.',
+    methods: [
+      {
+        signature: 'ipcMain: IpcMainLike',
+        description: 'The Electron ipcMain surface (the app owns the module import; the bridge stays dependency-free).',
+        parameters: [],
+      },
+      {
+        signature: 'validateSender: (event: IpcEventLike) => boolean',
+        description: 'Trust fence: returns true only for the main window\'s top-level frame on this app\'s dist URL.',
+        parameters: [],
+      },
+    ],
+  },
+  {
     key: 'directoryPicker',
     summary: 'Abstract directory-picking service.',
     description: 'Abstract directory-picking service. Subclass, implement `capability()`, and load the subclass as a plugin — it registers as `ctx.directoryPicker` (one implementation per context; loading a second throws, cordis\' standard duplicate-service behavior). The capability object must be stable for the service lifetime: consumers may capture it across calls.',
@@ -1260,7 +1277,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async write(session: Session): Promise<void>',
-        description: 'Durably checkpoint one live session NOW (both mandatory points call this; tests and carriers may too). The registry cut is snapshotted at this boundary (states are live references), then the whole record is replaced. NOT fail-soft — callers on the fail-soft paths contain it.',
+        description: 'Durably checkpoint every projection for one live session NOW. Detach and explicit carrier calls use this full cut; scheduled checkpoints use the periodic-only cut. The registry states are snapshotted at this boundary, then the whole record is replaced. NOT fail-soft — callers on fail-soft paths contain it.',
         parameters: [{ name: 'session', description: 'the live session to checkpoint.' }],
         returns: 'resolution after durability and event emission.',
       },
@@ -1269,6 +1286,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Cold-read one persisted session\'s projections with zero full-log load: cached rows + a persistence `readFrom` tail from the registry\'s restore floor, refolded by the registry and written back (fail-soft) so the next cold read starts closer. A cache row invalidated by a shrunk log (crash-repair truncation) triggers one full re-read from seq 0 — the ladder\'s slow rung, still no crash. Rejects when the session has no persisted log (`not found` from the persistence seam).',
         parameters: [{ name: 'id', description: 'the persisted session to read.' }, { name: 'signal', description: 'optional cancellation for the persistence reads.' }],
         returns: 'the snapshot cut at the stored log end.',
+      },
+      {
+        signature: 'async coldState<K extends keyof SessionProjectionStateMap>( id: SessionId, key: K, signal?: AbortSignal, ): Promise<SessionProjectionStateMap[K] | undefined>',
+        description: 'Restore one Host projection state through the persisted checkpoint and tail-replay ladder. The returned JSON value is detached from both the registry fold and the durable cache; an unregistered key returns `undefined`. Persistence and cancellation failures reject unchanged.',
+        parameters: [{ name: 'id', description: 'persisted session to read.' }, { name: 'key', description: 'registered Host or client-visible projection key.' }, { name: 'signal', description: 'optional cancellation for persistence reads.' }],
+        returns: 'detached state, or `undefined` when the key is not registered.',
       },
     ],
   },
@@ -1285,7 +1308,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'register< K extends Exclude<keyof SessionProjectionStateMap, keyof SessionProjectionMap>, S extends SessionProjectionStateMap[K], >( definition: Omit<ProjectionDefinition<K, S>, \'wire\'>, ): () => void',
-        description: 'Register one host-only unit. Its state is omitted from client snapshots and always checkpointed like every other unit.',
+        description: 'Register one host-only unit. Its state is omitted from client snapshots.',
         parameters: [{ name: 'definition', description: 'key, state schema, pure unit functions, and stateVersion.' }],
         returns: 'the exact disposer that unregisters this unit.',
       },
@@ -1308,9 +1331,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the snapshot; `values` is empty when no client-visible unit is registered.',
       },
       {
-        signature: 'checkpoint(session: Session): ProjectionCheckpoint',
+        signature: 'checkpoint(session: Session, mode: \'all\' | \'periodic\' = \'all\'): ProjectionCheckpoint',
         description: 'State-level checkpoint of every persisted unit for one session, read from the watermark cache (missing cells fold lazily over the in-memory log). This is the write side of the persisted projection cache: the returned rows are the `(key → {ver, seq, val})` part of the durable `(sessionId, key, ver, seq, val)` rows. Every `val` is a DETACHED structured clone — never the live cell reference: the watermark cache is this registry\'s authoritative mutable state, and a caller reaching the live reference could corrupt every subsequent snapshot and frame through it (plain JSON by the unit contract, so the clone is total).',
-        parameters: [{ name: 'session', description: 'the session whose unit states are checkpointed.' }],
+        parameters: [{ name: 'session', description: 'the session whose unit states are checkpointed.' }, { name: 'mode', description: 'include every unit, or omit detach-only units at a periodic write.' }],
         returns: 'one row per registered key.',
       },
       {
@@ -2046,6 +2069,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Heuristically price one model-visible message (instance face of the pure `estimateMessage` export from `estimate.ts`).',
         parameters: [{ name: 'message', description: 'message to price without mutation.' }],
         returns: 'content and role-framing tokens under the fixed service heuristic.',
+      },
+    ],
+  },
+  {
+    key: 'tokenUsageReport',
+    summary: 'Host Remote that merges live and persisted session usage.',
+    description: 'Host Remote that merges live and persisted session usage.',
+    methods: [
+      {
+        signature: '@Remote(\'snapshot\') async snapshot( request: TokenUsageReportRequest, signal?: AbortSignal, ): Promise<TokenUsageReportSnapshot>',
+        description: 'Merge every persisted and live session into one provider-usage report. A live session supersedes the same persisted id. Cold failures exclude only that session and increment coverage; listing and cancellation failures reject the whole request.',
+        parameters: [{ name: 'request', description: 'IANA time zone used for calendar-day grouping.' }, { name: 'signal', description: 'optional caller cancellation.' }],
+        returns: 'global lifetime and rolling-365-day usage.',
       },
     ],
   },
@@ -3514,6 +3550,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface InvokeRemoteRequest {\n    readonly namespace: string;\n    readonly method: string;\n    readonly args: Readonly<Record<string, unknown>>;\n    readonly signal?: AbortSignal;\n}',
   },
   {
+    name: 'IpcEventLike',
+    declaration: 'export interface IpcEventLike {\n    readonly senderFrame: {\n        readonly url: string;\n    } | null;\n    readonly sender: {\n        send(channel: string, ...args: unknown[]): void;\n    };\n}',
+  },
+  {
+    name: 'IpcMainLike',
+    declaration: 'export interface IpcMainLike {\n    handle(channel: string, listener: (event: IpcEventLike, ...args: unknown[]) => unknown): void;\n    on(channel: string, listener: (event: IpcEventLike, ...args: unknown[]) => void): void;\n    removeHandler(channel: string): void;\n    removeListener(channel: string, listener: (event: IpcEventLike, ...args: unknown[]) => void): void;\n}',
+  },
+  {
     name: 'JobDoneListener',
     declaration: 'export type JobDoneListener = (snapshot: JobSnapshot, owner: Agent | undefined) => void | PromiseLike<void>;',
   },
@@ -3863,7 +3907,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ProjectionDefinition',
-    declaration: 'export interface ProjectionDefinition<K extends keyof SessionProjectionStateMap, S extends SessionProjectionStateMap[K] = SessionProjectionStateMap[K]> {\n    key: K;\n    stateSchema: ZodType<S>;\n    init(): NoInfer<S>;\n    apply(state: NoInfer<S>, event: SessionEvent): NoInfer<S>;\n    wire?: K extends keyof SessionProjectionMap ? {\n        viewSchema: ZodType<SessionProjectionMap[K]>;\n        view(state: NoInfer<S>): SessionProjectionMap[K];\n    } : never;\n    stateVersion: number;\n}',
+    declaration: 'export interface ProjectionDefinition<K extends keyof SessionProjectionStateMap, S extends SessionProjectionStateMap[K] = SessionProjectionStateMap[K]> {\n    key: K;\n    stateSchema: ZodType<S>;\n    checkpoint?: \'periodic\' | \'detach\';\n    init(): NoInfer<S>;\n    apply(state: NoInfer<S>, event: SessionEvent): NoInfer<S>;\n    wire?: K extends keyof SessionProjectionMap ? {\n        viewSchema: ZodType<SessionProjectionMap[K]>;\n        view(state: NoInfer<S>): SessionProjectionMap[K];\n    } : never;\n    stateVersion: number;\n}',
   },
   {
     name: 'ProjectionSnapshot',
@@ -4744,6 +4788,26 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TokenUsage',
     declaration: 'export interface TokenUsage {\n    inputTokens: number;\n    outputTokens: number;\n    cacheReadTokens?: number;\n    cacheWriteTokens?: number;\n    reasoningTokens?: number;\n}',
+  },
+  {
+    name: 'TokenUsageBuckets',
+    declaration: 'export interface TokenUsageBuckets {\n    readonly uncachedInputTokens: number;\n    readonly cacheReadTokens: number;\n    readonly cacheWriteTokens: number;\n    readonly outputTokens: number;\n}',
+  },
+  {
+    name: 'TokenUsageDay',
+    declaration: 'export interface TokenUsageDay {\n    readonly date: string;\n    readonly buckets: TokenUsageBuckets;\n    readonly routes: readonly {\n        readonly route: TokenUsageRoute;\n        readonly buckets: TokenUsageBuckets;\n    }[];\n}',
+  },
+  {
+    name: 'TokenUsageReportRequest',
+    declaration: 'export interface TokenUsageReportRequest {\n    readonly timeZone: string;\n}',
+  },
+  {
+    name: 'TokenUsageReportSnapshot',
+    declaration: 'export interface TokenUsageReportSnapshot {\n    readonly generatedAt: number;\n    readonly timeZone: string;\n    readonly window: {\n        readonly from: string;\n        readonly through: string;\n        readonly days: 365;\n    };\n    readonly lifetime: TokenUsageBuckets;\n    readonly coverage: {\n        readonly sessionCount: number;\n        readonly failedSessionCount: number;\n    };\n    readonly days: readonly TokenUsageDay[];\n}',
+  },
+  {
+    name: 'TokenUsageRoute',
+    declaration: 'export type TokenUsageRoute = {\n    readonly kind: \'model\';\n    readonly provider: string;\n    readonly model: string;\n} | {\n    readonly kind: \'unknown\';\n};',
   },
   {
     name: 'ToolCallKind',

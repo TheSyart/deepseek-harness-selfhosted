@@ -1,0 +1,7 @@
+- menu:
+  - menuitem "Commands":
+    - img
+    - text: Commands
+  - menuitem "Add photo":
+    - img
+    - text: Add photo

@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "files": [
+    "src/desktop-api.ts",
+    "src/main-runtime.ts",
+    "src/main.ts",
+    "src/preload.ts"
+  ],
+  "references": [
+    { "path": "../../vendor/cordis" },
+    { "path": "../../vendor/include" },
+    { "path": "../../vendor/loader" },
+    { "path": "../../vendor/hmr" },
+    { "path": "../../vendor/timer" },
+    { "path": "../../packages/boot/app-boot" },
+    { "path": "../../packages/bundle/base" },
+    { "path": "../../packages/bundle/desktop" },
+    { "path": "../../packages/bundle/web-app" },
+    { "path": "../../packages/util/home-paths" },
+    { "path": "../../packages/util/launch-environment" }
+  ]
+}

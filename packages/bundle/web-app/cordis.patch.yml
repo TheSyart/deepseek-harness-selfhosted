@@ -79,6 +79,14 @@
         writeEveryEvents: 200
         writeIntervalMs: 5000
 
+    # Global provider-reported Token usage over live and persisted session
+    # projection states. Cold history reads are bounded independently of the
+    # browser's polling interval.
+    - id: token-usage-report
+      name: '@deepseek-ai/dsh-token-usage-report'
+      config:
+        readConcurrency: 8
+
     - id: session-reference
       name: '@deepseek-ai/dsh-session-reference'
 
@@ -202,6 +210,9 @@
 
     - id: ui-settings-models
       name: '@deepseek-ai/dsh-client-ui-settings-models'
+
+    - id: ui-settings-token-usage
+      name: '@deepseek-ai/dsh-client-ui-settings-token-usage'
 
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'

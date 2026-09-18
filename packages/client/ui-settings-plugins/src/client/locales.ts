@@ -11,6 +11,9 @@ export type PluginsSettingsLocaleKey =
   | 'webSearchTitle' | 'webSearchDescription'
   | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
+  | 'manualTabIntro'
+  | 'rheostatPetTitle' | 'rheostatPetDescription' | 'rheostatPetOn' | 'rheostatPetOff'
+  | 'rheostatPetToggleLabel' | 'rheostatPetFailed'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -51,6 +54,13 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchBaseUrlHint: 'Leave blank to use the provider default.',
   webSearchMaxUses: 'Max searches per request',
   webSearchMaxUsesHint: 'How many times one request may search before it must answer.',
+  manualTabIntro: 'Interface plugins managed by hand. A switch applies immediately and is restored on the next launch.',
+  rheostatPetTitle: 'Rheostat pet',
+  rheostatPetDescription: 'A small floating pet widget over the interface.',
+  rheostatPetOn: 'On',
+  rheostatPetOff: 'Off',
+  rheostatPetToggleLabel: 'Toggle the rheostat pet',
+  rheostatPetFailed: 'The pet failed to load; the switch stays off.',
 }
 
 /** Simplified Chinese copy. */
@@ -92,4 +102,11 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   webSearchBaseUrlHint: '留空则使用提供方默认地址。',
   webSearchMaxUses: '单次请求最多搜索次数',
   webSearchMaxUsesHint: '一次请求在必须作答前最多可以搜索多少次。',
+  manualTabIntro: '手动管理的界面插件。开关即时生效，并在下次启动时恢复。',
+  rheostatPetTitle: '变阻器宠物',
+  rheostatPetDescription: '悬浮在界面上的小宠物。',
+  rheostatPetOn: '已开启',
+  rheostatPetOff: '已关闭',
+  rheostatPetToggleLabel: '开关变阻器宠物',
+  rheostatPetFailed: '宠物加载失败，开关保持关闭。',
 }

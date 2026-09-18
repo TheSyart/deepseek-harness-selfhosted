@@ -1,0 +1,14 @@
+- heading "用量趋势" [level=3]
+- button "30 天" [pressed]
+- button "90 天"
+- button "365 天"
+- button "按模型" [pressed]
+- button "按类型"
+- button "model-a, alpha" [pressed]: model-a alpha
+- button "model-b, bravo" [pressed]: model-b bravo
+- button "model-c, charlie" [pressed]: model-c charlie
+- button "model-d, delta" [pressed]: model-d delta
+- button "model-e, echo" [pressed]: model-e echo
+- button "其他" [pressed]
+- 'img "Token 用量趋势图: 2026-08-24"'
+- slider "浏览趋势日期"

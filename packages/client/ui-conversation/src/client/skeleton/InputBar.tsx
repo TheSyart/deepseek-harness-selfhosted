@@ -10,7 +10,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
+  IconCodeOutline16, IconPaperclipOutline16, IconPlusOutline16, IconWarningOutline16, Menu, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -88,6 +88,7 @@ export function InputBar({
   const notice = useNotices(s => s)
   const lexicon = useLexicon(s => s)
   const commandMenuOpen = useMenuLauncher(source => source === 'command')
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
   const promptError = useSession(s => s.promptError) ?? null
   const running = useSession(s => s.running) ?? false
   const subagent = useSession(s => s.subagent) ?? null
@@ -136,6 +137,7 @@ export function InputBar({
     if (notice?.level === 'error') showToast(notice.text)
   }, [notice, showToast])
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const imagePickerRef = useRef<HTMLInputElement | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const mirrorRef = useRef<HTMLDivElement | null>(null)
@@ -536,6 +538,16 @@ export function InputBar({
 
   const canAcceptDrop = !locked && !machineBusy && addImages !== undefined
 
+  useEffect(() => {
+    if (locked || commandMenuOpen) setAddMenuOpen(false)
+  }, [locked, commandMenuOpen])
+
+  const onImageFilesSelected = (e: ChangeEvent<HTMLInputElement>): void => {
+    const files = Array.from(e.currentTarget.files ?? [])
+    e.currentTarget.value = ''
+    if (canAcceptDrop) intakeImages(files)
+  }
+
   const onSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>): void => {
     // Any caret/selection gesture ends a live paste attempt (the machine
     // cannot observe DOM selection). Cheap no-op when none is live.
@@ -555,6 +567,15 @@ export function InputBar({
   const onToggleCommandMenu = (): void => {
     const el = inputRef.current
     if (el !== null) toggleCommandMenu?.(selectionOf(el))
+  }
+
+  const onSelectAddAction = (id: string): void => {
+    setAddMenuOpen(false)
+    if (id === 'commands') {
+      onToggleCommandMenu()
+      return
+    }
+    if (id === 'photo') imagePickerRef.current?.click()
   }
 
   // Ordinary sessions retain their primary Send/Stop toggle. A continuable
@@ -769,20 +790,50 @@ export function InputBar({
         </div>
         <div className={css.row}>
           <div className={css.tools}>
-            <Tooltip label={t('input.commands')} side="top" delayMs={500}>
-              <button
-                type="button"
-                className={css.add}
-                aria-label={t('input.commands')}
-                aria-haspopup="listbox"
-                aria-expanded={commandMenuOpen}
-                disabled={locked || toggleCommandMenu === undefined}
-                onMouseDown={keepFocus}
-                onClick={onToggleCommandMenu}
-              >
-                <IconPlusOutline16 size={14} />
-              </button>
-            </Tooltip>
+            <input
+              ref={imagePickerRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
+              hidden
+              onChange={onImageFilesSelected}
+            />
+            <Menu
+              open={addMenuOpen}
+              side="top"
+              items={[
+                {
+                  id: 'commands',
+                  label: t('input.commands'),
+                  icon: <IconCodeOutline16 />,
+                  disabled: locked || toggleCommandMenu === undefined,
+                },
+                {
+                  id: 'photo',
+                  label: t('input.addPhoto'),
+                  icon: <IconPaperclipOutline16 />,
+                  disabled: !canAcceptDrop,
+                },
+              ]}
+              onClose={() => { setAddMenuOpen(false) }}
+              onSelect={onSelectAddAction}
+              anchor={(
+                <Tooltip label={t('input.addContent')} side="top" delayMs={500}>
+                  <button
+                    type="button"
+                    className={css.add}
+                    aria-label={t('input.addContent')}
+                    aria-haspopup="menu"
+                    aria-expanded={addMenuOpen || commandMenuOpen}
+                    disabled={locked || (toggleCommandMenu === undefined && !canAcceptDrop)}
+                    onMouseDown={keepFocus}
+                    onClick={() => { setAddMenuOpen(open => !open) }}
+                  >
+                    <IconPlusOutline16 size={14} />
+                  </button>
+                </Tooltip>
+              )}
+            />
             <div className={css.modes}>
               {accessSelect}
               {renderSlot('conversation.input.plan', { locked })}

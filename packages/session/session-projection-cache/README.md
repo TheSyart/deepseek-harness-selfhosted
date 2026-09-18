@@ -9,7 +9,7 @@ A stored row `(key → {ver, seq, val})` is a fold shortcut, never an authority:
 - **Every background write is fail-soft.** A failed durable write logs a warning and keeps the cache stale; the next write or cold read self-heals. A crash between writes costs a longer tail replay, never a wrong value.
 - **A `ver` mismatch against the live unit's `stateVersion` discards, never migrates.** A unit bump invalidates its rows at read time; the key refolds from the log.
 - **A row must pass the live unit's `stateSchema`.** A malformed row is omitted from the zero-I/O view and rejected by restore so the cold-read ladder refolds it from the log.
-- **Whole-record writes.** Each write replaces the session's full checkpoint (the registry cut is always complete), snapshotted through the lossless-JSON boundary — a unit state violating the plain-JSON contract fails loud.
+- **Whole-record writes.** Each write replaces the session checkpoint and snapshots included rows through the lossless-JSON boundary — a unit state violating the plain-JSON contract fails loud. Periodic writes omit units declaring `checkpoint: 'detach'`; detach and explicit `write(session)` include every unit.
 - **Records are bound to a log lifecycle, not just an id.** Each record stores the header identity (`createdAt`, `cwd`) it was folded from; every read validates it (the live or stored header is the witness) before accepting a row, so a deleted-then-recreated id or a persistence store swapped under a surviving cache discards the unrelated record instead of seeding phantom values.
 - **The log leads, the cache follows.** A live checkpoint flushes the session's buffered events durably BEFORE the cache row lands, so a crash can leave the cache behind the log (a longer tail replay) but never ahead of it.
 
@@ -26,6 +26,8 @@ Two mandatory points, throttled in between:
 
 Both `Config` fields are required (no defaults): flush cadence is a deployment choice with no universally correct value, stated in cordis.yml.
 
+A projection with large append-oriented state may declare `checkpoint: 'detach'`. Count, interval, and `turn/end` writes then omit that row instead of repeatedly serializing the full history; session detach and cold-read write-back persist it. A crash before detach merely causes the next cold read to replay more of the authoritative log.
+
 ## Listing read (`cachedSnapshot(meta)`)
 
 The zero-I/O rung: client values viewed straight from the identity-matching stored record (version- and state-schema-matching keys only), returned as a `{asOfSeq, values}` cut — `asOfSeq` is the lowest served-row watermark, so a client seeding its per-session value store under higher-seq-wins can never let a stale list block overwrite a newer push frame. Host-only rows are never returned. `undefined` when no usable client row exists (unknown id, unrelated lifecycle, or no usable rows); the api-proxy list carrier turns that into an absent column.
@@ -34,7 +36,9 @@ The zero-I/O rung: client values viewed straight from the identity-matching stor
 
 The read ladder, zero full-log load on the happy path: cached rows → `sessionProjections.restoreFloor` (anchored one event below the lowest usable watermark) → persistence `readFrom(id, floor)` → `sessionProjections.restore` → fail-soft write-back of the refreshed rows. The anchor makes a shrunk log (crash-repair truncation) provable: an overreaching row triggers exactly one full re-read from seq 0 instead of serving a ghost value. No registered units serve `{asOfSeq: -1, values: {}}` without touching persistence; a session with no persisted log rejects with the seam's `not found`.
 
-`write(session)` is the synchronous-cut checkpoint both mandatory points use; carriers may call it directly (not fail-soft — the fail-soft wrappers own containment).
+`write(session)` takes an explicit all-unit checkpoint and is used at detach; scheduled turn/count/interval writes take the periodic-only cut. Carriers may call `write(session)` directly (not fail-soft — the fail-soft wrappers own containment).
+
+`coldState(sessionId, projectionKey, signal?)` runs the same identity check, version invalidation, checkpoint restore, tail replay, and fail-soft write-back, then returns one detached Host or client-visible state selected through `SessionProjectionStateMap`. An unregistered key returns `undefined`; persistence and cancellation failures reject unchanged. This is the Host-only read path for projections that intentionally have no client wire value.
 
 ## Composition
 

@@ -5,6 +5,7 @@
  */
 
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-session-projection/types'
 
 export type { ContextBreakdownProjection, ContextPressureProjection, TokenUsageProjection } from './projection.ts'
 
@@ -39,4 +40,48 @@ export interface TokenSurfaceNode {
   readonly seq: number
   /** Heuristic tokens for the exact message projected by this node. */
   readonly tokens: number
+}
+
+/** Exact provider route attached to one provider-reported usage sample. */
+export type TokenUsageTimelineRoute =
+  | { readonly kind: 'model'; readonly provider: string; readonly model: string }
+  | { readonly kind: 'unknown' }
+
+/** One model call's disjoint provider-reported token buckets. */
+export interface TokenUsageTimelineBuckets {
+  readonly uncachedInputTokens: number
+  readonly outputTokens: number
+  readonly cacheReadTokens: number
+  readonly cacheWriteTokens: number
+}
+
+/** One model call retained by the Host-only timeline projection. */
+export interface TokenUsageTimelineSample {
+  /** Seq of the first usage event reported for this turn and step. */
+  readonly seq: number
+  /** Millisecond timestamp of the matching `step/start` event. */
+  readonly time: number
+  readonly turn: number
+  readonly step: number
+  readonly route: TokenUsageTimelineRoute
+  readonly buckets: TokenUsageTimelineBuckets
+}
+
+/** Reverse-linked bounded block used for append-oriented timeline persistence. */
+export interface TokenUsageTimelineChunk {
+  readonly samples: readonly TokenUsageTimelineSample[]
+  readonly previous: TokenUsageTimelineChunk | null
+}
+
+/** Persistable Host-only state used to aggregate usage across saved sessions. */
+export interface TokenUsageTimelineState {
+  readonly route: TokenUsageTimelineRoute
+  readonly step: { readonly turn: number; readonly step: number; readonly time: number } | null
+  readonly head: TokenUsageTimelineChunk | null
+}
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    tokenUsageTimeline: TokenUsageTimelineState
+  }
 }

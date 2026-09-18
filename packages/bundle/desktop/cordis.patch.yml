@@ -1,0 +1,60 @@
+# The dsh-desktop bundle patch: the Electron desktop surface over the dsh-web-app layer.
+# Applied after web-app's patch; rows here override web-app rows by id, with
+# the profile's own cordis.patch.yml and any --patch overlays still to come.
+#
+# A patch replaces the targeted row's whole `config` (and `inject`), so each
+# row below restates every key it owns.
+#
+# The desktop surface carries no HTTP: the webserver row is disabled and the
+# desktop-runtime row provides a composition-satisfying `webServer` facade.
+# Renderer traffic (RPC, downlink streams, plugin bundles, the boot graph)
+# rides the desktop-bridge's Electron IPC handlers, registered only when the
+# app assembly provides `desktopStartup` — under plain Node the row disables
+# itself and the profile boots a windowless, portless composition.
+
+# ── web-only rows the desktop surface deliberately drops ─────────────────────
+
+- id: webserver
+  disabled: true
+
+- id: web-startup
+  disabled: true
+
+# Web runtime glue (dist serving, URL line, web-surface prompt) is replaced by
+# desktop-runtime below; its `webRuntime` service is why the connection row's
+# inject must be replaced in the same layer.
+- id: web-runtime
+  disabled: true
+
+# Client-plugin HMR rides webServer routes; the desktop bridge has no HMR
+# channel yet, so the row stays off (the web surface also keeps HMR disabled).
+- id: client-hmr
+  disabled: true
+
+# The connection node half binds /api and the downlink WebSockets to the
+# webServer facade (no-ops there); its browser half is the renderer's wire
+# consumer and stays mounted. Without the web-runtime row there is no
+# `webRuntime` provider, so the inject and config expression must go.
+- id: connection
+  inject: []
+  config:
+    trustedHosts: []
+
+# ── desktop-only rows ─────────────────────────────────────────────────────────
+
+- insert:
+    # The desktop runtime glue: the webServer composition facade plus the
+    # model-visible desktop surface prompt section.
+    - id: desktop-runtime
+      name: '@deepseek-ai/dsh-desktop'
+      config:
+        surfaceContext: true
+
+    # The Electron IPC bridge: serves /api-shaped fetch (unary + SSE downlink
+    # streams), plugin bundles, and the boot graph to the renderer. Gated on
+    # the app-assembly `desktopStartup` service so a plain-node
+    # `dsh --profile desktop` boots without hanging on the inject.
+    - id: desktop-bridge
+      name: '@deepseek-ai/dsh-desktop/startup'
+      inject: [desktopStartup, clientModules, apiProxy, connection]
+      disabled: !!js ctx.get('desktopStartup') === undefined

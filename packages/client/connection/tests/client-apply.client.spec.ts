@@ -12,6 +12,13 @@ import { WebApiClient } from '../src/client/web-api-client.ts'
 
 type Win = { location?: { hostname: string; search: string; origin?: string } }
 type WebSocketGlobal = { WebSocket?: typeof WebSocket }
+type TransportGlobal = {
+  __DSH_TRANSPORT__?: {
+    createApiClient(): FixtureApiClient
+    fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
+    localAuthority?: boolean
+  }
+}
 
 const originalWebSocket = globalThis.WebSocket
 const sockets: FakeWebSocket[] = []
@@ -49,6 +56,7 @@ class FakeWebSocket extends EventTarget {
 
 afterEach(() => {
   delete (globalThis as Win).location
+  delete (globalThis as TransportGlobal).__DSH_TRANSPORT__
   sockets.length = 0
   if (originalWebSocket === undefined) delete (globalThis as WebSocketGlobal).WebSocket
   else globalThis.WebSocket = originalWebSocket
@@ -82,6 +90,21 @@ describe('connection client apply', () => {
   it('reports non-loopback page authority through the connection handle', async () => {
     ;(globalThis as Win).location = { hostname: '192.0.2.20', search: '' }
     expect((await mount()).isLoopback).toBe(false)
+  })
+
+  it('does not treat an opaque file page as loopback without an authoritative transport', async () => {
+    ;(globalThis as Win).location = { hostname: '', search: '', origin: 'null' }
+    expect((await mount()).isLoopback).toBe(false)
+  })
+
+  it('accepts an explicit local authority from an in-process transport', async () => {
+    ;(globalThis as Win).location = { hostname: '', search: '', origin: 'null' }
+    ;(globalThis as TransportGlobal).__DSH_TRANSPORT__ = {
+      createApiClient: () => new FixtureApiClient(),
+      fetch: globalThis.fetch,
+      localAuthority: true,
+    }
+    expect((await mount()).isLoopback).toBe(true)
   })
 
   it('start() hands out one loop, rejects a second consumer, and stop() aborts the streams', async () => {

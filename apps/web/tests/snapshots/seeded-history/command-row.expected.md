@@ -46,7 +46,7 @@
 - img
 - text: permission preset read-only
 - textbox "Message the agent"
-- button "Commands":
+- button "Add content":
   - img
 - 'button "Access mode, current: Read Only"': Read Only
 - button "Select model, current DeepSeek-V4-Flash":

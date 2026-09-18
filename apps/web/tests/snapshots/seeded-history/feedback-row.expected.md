@@ -50,7 +50,7 @@
   - text: "feedback Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}. Session sharing is not configured."
 - text: "Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}. Session sharing is not configured."
 - textbox "Message the agent"
-- button "Commands":
+- button "Add content":
   - img
 - 'button "Access mode, current: Read Only"': Read Only
 - button "Select model, current DeepSeek-V4-Flash":
